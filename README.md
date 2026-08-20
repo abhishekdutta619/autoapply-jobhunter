@@ -170,6 +170,7 @@ whether you actually submitted, updating the job's status accordingly.
 | Executor fills fields incorrectly | The classifier is heuristic, not perfect — that's exactly why it pauses for your review instead of submitting automatically. Report the mismatch to yourself as a note to improve `app/executor/field_classifier.py` |
 | Workday: `ValueError` re: 'tenant\|wd_host\|site' | Check the format in `WORKDAY_COMPANIES` — it needs all three pieces, pipe-separated |
 | Workday: very slow Hunter run | Expected — per-job description fetching plus conservative delays add up fast for large companies. Set `WORKDAY_FETCH_DESCRIPTIONS=false` for a quicker listing-only pass |
+| `psycopg2.OperationalError: connection ... refused` on `localhost:5432` | No Postgres server is running, and `DATABASE_URL` is set (even to the placeholder in `.env.example`). Comment out `DATABASE_URL` in `.env` entirely to fall back to SQLite, or actually start a Postgres server (Docker: `docker run --name job-hunter-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=job_hunter -p 5432:5432 -d postgres:16-alpine`, then set `DATABASE_URL=postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/job_hunter`) |
 
 ---
 
@@ -314,7 +315,7 @@ python -m app.inspect_jobs --status TRASHED --limit 50
 pytest -v
 ```
 
-88 tests, covering all four phases:
+88 tests, covering all four phases plus their integration:
 - **Sources** — each adapter (including Workday's pagination and
   detail-fetch failure handling) against fixture data matching that
   provider's own documented response schema
@@ -338,6 +339,10 @@ pytest -v
   providers' `select_dropdown_option()` parsing, and — critically — a live
   browser test confirming a work-authorization dropdown is never sent to
   the mapper at all, not just never filled
+- **Integration** — a single job pushed through the real `upsert_job()` →
+  `evaluate_job()` → `fill_application()` functions each phase's CLI
+  actually calls, proving the phases hand off to each other correctly and
+  not just that each one works in isolation
 
 No live network calls or live company sites are touched by any test.
 
