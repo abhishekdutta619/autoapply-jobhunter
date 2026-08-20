@@ -1,0 +1,12 @@
+[
+  {
+    "title": "Migrating the payments service to microservices",
+    "tags": ["leadership", "distributed systems", "migration", "ownership"],
+    "text": "At ExampleCorp, our payments monolith was struggling under 2M+ transactions a day. I led the migration to a microservices architecture using Kafka and gRPC, coordinating with four other engineers over six months. We used a phased strangler-fig approach so nothing broke during the cutover, and ended up with a 40% reduction in p99 latency and zero downtime."
+  },
+  {
+    "title": "Debugging a production outage under pressure",
+    "tags": ["problem solving", "incident response", "debugging"],
+    "text": "During a Black Friday traffic spike, our checkout service started throwing 500 errors. I led the incident response, traced the issue to connection pool exhaustion by reading through recent deploys and dashboards, and shipped a hotfix within 25 minutes that restored service without losing a single order."
+  }
+]

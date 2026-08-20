@@ -1,0 +1,3 @@
+This is a placeholder file standing in for a real resume PDF.
+It exists only so Playwright's set_input_files() has a real file
+to attach during tests - its content is never read or checked.

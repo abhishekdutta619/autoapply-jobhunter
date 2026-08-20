@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head><title>Sample Job Application</title></head>
+<body>
+<form>
+  <label for="first_name">First Name</label>
+  <input type="text" id="first_name" name="first_name">
+
+  <label for="last_name">Last Name</label>
+  <input type="text" id="last_name" name="last_name">
+
+  <label for="email">Email Address</label>
+  <input type="email" id="email" name="email">
+
+  <label for="phone">Phone Number</label>
+  <input type="tel" id="phone" name="phone">
+
+  <label for="linkedin">LinkedIn Profile URL</label>
+  <input type="text" id="linkedin" name="linkedin_url">
+
+  <label for="github">GitHub Profile</label>
+  <input type="text" id="github" name="github_url">
+
+  <label for="portfolio">Portfolio / Personal Website</label>
+  <input type="text" id="portfolio" name="portfolio_url">
+
+  <label for="resume_upload">Resume/CV</label>
+  <input type="file" id="resume_upload" name="resume">
+
+  <label for="cover_letter_text">Cover Letter</label>
+  <textarea id="cover_letter_text" name="cover_letter"></textarea>
+
+  <label for="why_role">Why do you want to work here?</label>
+  <textarea id="why_role" name="why_role"></textarea>
+
+  <!-- Decoy: must NOT be filled with the candidate's own name -->
+  <label for="company_name">Current/Most Recent Company Name</label>
+  <input type="text" id="company_name" name="company_name">
+
+  <!-- Should be left for the human - no sensible default answer -->
+  <label for="how_heard">How did you hear about us?</label>
+  <select id="how_heard" name="how_heard">
+    <option value="">Select...</option>
+    <option value="linkedin">LinkedIn</option>
+    <option value="referral">Referral</option>
+  </select>
+
+  <!-- Sensitive - must NEVER be touched, even with a dropdown mapper -->
+  <label for="work_auth">Are you legally authorized to work in the US?</label>
+  <select id="work_auth" name="work_authorization">
+    <option value="">Select...</option>
+    <option value="yes">Yes</option>
+    <option value="no">No</option>
+  </select>
+
+  <button type="submit">Submit Application</button>
+</form>
+</body>
+</html>

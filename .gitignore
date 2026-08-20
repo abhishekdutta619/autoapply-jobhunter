@@ -1,0 +1,11 @@
+.env
+resume.md
+resume.pdf
+candidate_profile.json
+story_bank.json
+executor_review_job*.png
+*.db
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/

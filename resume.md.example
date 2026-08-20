@@ -1,0 +1,25 @@
+<!--
+Copy this file to resume.md and replace everything below with your real
+resume content. Plain text/markdown is fine - this gets pasted directly
+into the LLM prompt, so clarity matters more than formatting.
+-->
+
+# Jane Doe
+
+## Summary
+Backend engineer with 5 years building distributed systems in Python and Go.
+
+## Experience
+
+**Senior Backend Engineer — ExampleCorp** (2022–present)
+- Built and scaled a payments processing service handling 2M+ tx/day
+- Led migration from monolith to microservices using Kafka and gRPC
+
+**Backend Engineer — StartupCo** (2020–2022)
+- Built REST APIs in Django, deployed on AWS (ECS, RDS, SQS)
+
+## Skills
+Python, Go, PostgreSQL, Kafka, AWS, Docker, Kubernetes
+
+## Education
+B.S. Computer Science, State University (2020)
