@@ -26,7 +26,9 @@ else with the project.
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate       # macOS/Linux
+# .venv\Scripts\Activate.ps1    # Windows PowerShell
+# .venv\Scripts\activate.bat    # Windows cmd.exe
 pip install -r requirements.txt
 ```
 
@@ -170,6 +172,9 @@ whether you actually submitted, updating the job's status accordingly.
 | Executor fills fields incorrectly | The classifier is heuristic, not perfect — that's exactly why it pauses for your review instead of submitting automatically. Report the mismatch to yourself as a note to improve `app/executor/field_classifier.py` |
 | Workday: `ValueError` re: 'tenant\|wd_host\|site' | Check the format in `WORKDAY_COMPANIES` — it needs all three pieces, pipe-separated |
 | Workday: very slow Hunter run | Expected — per-job description fetching plus conservative delays add up fast for large companies. Set `WORKDAY_FETCH_DESCRIPTIONS=false` for a quicker listing-only pass |
+| Workday: every job's description fetch returns `422 Unprocessable Entity` | Fixed in this version — some tenants' `externalPath` already includes a leading `/job/` segment, which combined with the URL template's own `/job` produced a doubled `.../job/job/...` path. If you're on an older copy, pull the latest `app/sources/workday.py`. |
+| Greenhouse/Lever: `404 Not Found` even though the company definitely exists | The token often isn't the company's name — e.g. DoorDash's Greenhouse token is `doordashusa`, not `doordash`. Some companies have also switched ATS platforms entirely (Netflix moved off Lever). Verify by opening `boards.greenhouse.io/{slug}` or `jobs.lever.co/{slug}` directly in a browser before assuming your config is wrong. |
+| Windows: `pytest` / `python` / `playwright` "is not recognized as the name of a cmdlet..." | Your virtual environment isn't activated in this shell, or the package genuinely isn't installed. Run `.venv\Scripts\Activate.ps1` (PowerShell) or `.venv\Scripts\activate.bat` (cmd.exe) first — you should see `(.venv)` appear in your prompt — then re-run `pip install -r requirements.txt`. If PowerShell refuses to run the activation script with an execution-policy error, run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` first (affects only that terminal session). |
 | `psycopg2.OperationalError: connection ... refused` on `localhost:5432` | No Postgres server is running, and `DATABASE_URL` is set (even to the placeholder in `.env.example`). Comment out `DATABASE_URL` in `.env` entirely to fall back to SQLite, or actually start a Postgres server (Docker: `docker run --name job-hunter-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=job_hunter -p 5432:5432 -d postgres:16-alpine`, then set `DATABASE_URL=postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/job_hunter`) |
 
 ---

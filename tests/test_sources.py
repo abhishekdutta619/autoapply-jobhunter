@@ -61,7 +61,12 @@ WORKDAY_LIST_PAGE_FIXTURE = {
     "jobPostings": [
         {
             "title": "Senior Backend Engineer",
-            "externalPath": "/job/Fort-Collins/Senior-Backend-Engineer_R-3164651",
+            # Real-world shape observed in production (NVIDIA's tenant):
+            # externalPath already starts with "/job/". A fixture using
+            # the OTHER shape ("/Fort-Collins/..." with no /job/ prefix)
+            # would NOT have caught the doubled "/job/job/" bug - both
+            # shapes need coverage, see the dedicated test below.
+            "externalPath": "/job/US-CA-Santa-Clara/Senior-Backend-Engineer_JR2018037",
             "locationsText": "Fort Collins, CO",
             "postedOn": "Posted 5 Days Ago",
             "bulletFields": ["R-3164651"],
@@ -158,7 +163,7 @@ def test_workday_adapter_parses_fixture_with_description(monkeypatch):
     monkeypatch.setattr(settings, "request_delay_seconds", 0)
 
     with patch("httpx.post", return_value=_mock_response(WORKDAY_LIST_PAGE_FIXTURE)), \
-         patch("httpx.get", return_value=_mock_response(WORKDAY_DETAIL_FIXTURE)):
+         patch("httpx.get", return_value=_mock_response(WORKDAY_DETAIL_FIXTURE)) as mock_get:
         jobs = WorkdaySource().fetch_jobs("nvidia|wd5|NVIDIAExternalCareerSite")
 
     assert len(jobs) == 1
@@ -167,13 +172,53 @@ def test_workday_adapter_parses_fixture_with_description(monkeypatch):
     assert job.title == "Senior Backend Engineer"
     assert job.company == "nvidia"
     assert job.location == "Fort Collins, CO"
-    assert job.external_id == "/job/Fort-Collins/Senior-Backend-Engineer_R-3164651"
+    assert job.external_id == "/job/US-CA-Santa-Clara/Senior-Backend-Engineer_JR2018037"
     assert job.apply_url == (
         "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite"
-        "/job/Fort-Collins/Senior-Backend-Engineer_R-3164651"
+        "/job/US-CA-Santa-Clara/Senior-Backend-Engineer_JR2018037"
     )
     assert job.description_html == "<p>We are looking for a backend engineer...</p>"
     assert job.posted_at is None  # relative string, deliberately not parsed
+
+    # Regression test for a real production bug: externalPath that already
+    # starts with "/job/" must NOT produce a doubled "/job/job/" detail URL
+    # (Workday returns 422 Unprocessable Entity for that, on every job).
+    called_url = mock_get.call_args[0][0]
+    assert "/job/job/" not in called_url
+    assert called_url == (
+        "https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/"
+        "NVIDIAExternalCareerSite/job/US-CA-Santa-Clara/Senior-Backend-Engineer_JR2018037"
+    )
+
+
+def test_workday_detail_url_handles_external_path_without_job_prefix(monkeypatch):
+    """The other real-world shape: some tenants' externalPath does NOT
+    include a leading '/job/'. Confirm the detail URL still comes out
+    correct - exactly one '/job' segment - in this case too.
+    """
+    monkeypatch.setattr(settings, "workday_fetch_descriptions", True)
+    monkeypatch.setattr(settings, "workday_detail_delay_seconds", 0)
+    monkeypatch.setattr(settings, "request_delay_seconds", 0)
+
+    fixture = {
+        "total": 1,
+        "jobPostings": [
+            {
+                **WORKDAY_LIST_PAGE_FIXTURE["jobPostings"][0],
+                "externalPath": "/Fort-Collins/Senior-Backend-Engineer_R-3164651",
+            },
+        ],
+    }
+
+    with patch("httpx.post", return_value=_mock_response(fixture)), \
+         patch("httpx.get", return_value=_mock_response(WORKDAY_DETAIL_FIXTURE)) as mock_get:
+        WorkdaySource().fetch_jobs("nvidia|wd5|NVIDIAExternalCareerSite")
+
+    called_url = mock_get.call_args[0][0]
+    assert called_url == (
+        "https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/"
+        "NVIDIAExternalCareerSite/job/Fort-Collins/Senior-Backend-Engineer_R-3164651"
+    )
 
 
 def test_workday_adapter_skips_description_when_disabled(monkeypatch):

@@ -55,6 +55,21 @@ def parse_company_slug(slug: str) -> WorkdayCompany:
     return WorkdayCompany(tenant=tenant, wd_host=wd_host, site=site)
 
 
+def _normalize_external_path_for_detail(external_path: str) -> str:
+    """DETAIL_URL always adds exactly one '/job' segment itself. Some
+    tenants' externalPath already starts with '/job/' (observed in real
+    NVIDIA data - '/job/US-CA-Santa-Clara/Title_JR123'), others don't
+    (observed in Lever/Greenhouse-adjacent docs - '/Fort-Collins/Title').
+    Without this normalization, tenants in the first group get a doubled
+    '.../job/job/...' path and Workday returns 422 Unprocessable Entity
+    for every single job - which also means every fetch exhausts all
+    retries, making the whole run dramatically slower for no benefit.
+    """
+    if external_path.startswith("/job/"):
+        return external_path[len("/job"):]
+    return external_path
+
+
 class WorkdaySource:
     name = "workday"
 
@@ -72,9 +87,10 @@ class WorkdaySource:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=2, min=4, max=30))
     def _fetch_description(self, company: WorkdayCompany, external_path: str) -> str | None:
+        normalized_path = _normalize_external_path_for_detail(external_path)
         url = DETAIL_URL.format(
             tenant=company.tenant, wd_host=company.wd_host, site=company.site,
-            external_path=external_path,
+            external_path=normalized_path,
         )
         response = httpx.get(url, headers={"Accept-Language": "en-US"}, timeout=30.0)
         response.raise_for_status()
