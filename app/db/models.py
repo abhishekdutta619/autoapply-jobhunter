@@ -53,6 +53,10 @@ class Job(Base):
         String(32), default=JobStatus.PENDING_EVALUATION.value, index=True
     )
     match_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # The LLM's reasoning for match_score - previously computed by the
+    # Evaluator but discarded; needed by the dashboard's review queue so
+    # a human has something to go on besides a bare number.
+    rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     scraped_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(

@@ -4,7 +4,6 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 
 import { routes } from './app.routes';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
-import { mockApiInterceptor } from './core/interceptors/mock-api.interceptor';
 
 // No provideZoneChangeDetection here - Angular 21 projects are zoneless
 // by default (no zone.js polyfill at all), and everything in this app
@@ -14,8 +13,9 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    // mockApiInterceptor stands in for the FastAPI service that doesn't
-    // exist yet - remove it here once real endpoints are live.
-    provideHttpClient(withInterceptors([errorInterceptor, mockApiInterceptor])),
+    // /api and /ws are forwarded to the FastAPI backend on :8000 via
+    // proxy.conf.json when running `ng serve` - see dashboard/README
+    // (or PROJECT_NOTES.md) for how to run both together.
+    provideHttpClient(withInterceptors([errorInterceptor])),
   ],
 };

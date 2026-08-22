@@ -55,6 +55,11 @@ class Settings:
     resume_path: str = os.getenv("RESUME_PATH", "resume.md")
     # Original project spec: approve anything scoring *above* 85.
     approval_threshold: int = int(os.getenv("APPROVAL_THRESHOLD", "85"))
+    # Below approval_threshold but at/above this: held as PENDING_EVALUATION
+    # for a human to manually approve/reject via the dashboard, instead of
+    # being auto-trashed. Set to 0 (or leave REVIEW_THRESHOLD unset and pass
+    # None) to restore the original hard-cutoff behavior with no review band.
+    review_threshold: int = int(os.getenv("REVIEW_THRESHOLD", "60"))
     eval_request_delay_seconds: float = float(os.getenv("EVAL_REQUEST_DELAY_SECONDS", "1.0"))
 
     # --- Executor (Phase 3) ---

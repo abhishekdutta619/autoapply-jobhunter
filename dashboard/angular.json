@@ -3,11 +3,11 @@
   "version": 1,
   "cli": {
     "packageManager": "npm",
-    "analytics": "d73f561e-c63c-4724-8228-72eec9a3e523"
+    "analytics": "c5bbad42-9552-431b-915d-df546c92bac1"
   },
   "newProjectRoot": "projects",
   "projects": {
-    "jobhunter-dashboard-v21": {
+    "jobhunter-dashboard": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -62,13 +62,16 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "jobhunter-dashboard-v21:build:production"
+              "buildTarget": "jobhunter-dashboard:build:production"
             },
             "development": {
-              "buildTarget": "jobhunter-dashboard-v21:build:development"
+              "buildTarget": "jobhunter-dashboard:build:development"
             }
           },
-          "defaultConfiguration": "development"
+          "defaultConfiguration": "development",
+          "options": {
+            "proxyConfig": "proxy.conf.json"
+          }
         },
         "test": {
           "builder": "@angular/build:unit-test"
