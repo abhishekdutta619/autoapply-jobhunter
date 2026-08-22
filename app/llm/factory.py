@@ -17,6 +17,11 @@ def get_llm_client() -> LLMClient:
             api_key=settings.anthropic_api_key, model=settings.anthropic_model
         )
 
+    if settings.llm_provider == "ollama":
+        from app.llm.ollama_client import OllamaEvaluator
+
+        return OllamaEvaluator(base_url=settings.ollama_base_url, model=settings.ollama_model)
+
     raise ValueError(
-        f"Unknown LLM_PROVIDER {settings.llm_provider!r}. Use 'openai' or 'anthropic'."
+        f"Unknown LLM_PROVIDER {settings.llm_provider!r}. Use 'openai', 'anthropic', or 'ollama'."
     )

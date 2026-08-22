@@ -38,13 +38,19 @@ class Settings:
     )
 
     # --- Evaluator (Phase 2) ---
-    llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")  # "anthropic" | "openai"
+    llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")  # "anthropic" | "openai" | "ollama"
 
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o")
 
     anthropic_api_key: str | None = os.getenv("ANTHROPIC_API_KEY")
     anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
+
+    # Local, free, no API key - runs entirely on your own machine via Ollama.
+    # Slower than a cloud provider and quality depends on the model you've
+    # pulled; see README's "Local LLM (Ollama)" section.
+    ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
 
     resume_path: str = os.getenv("RESUME_PATH", "resume.md")
     # Original project spec: approve anything scoring *above* 85.

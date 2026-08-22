@@ -175,6 +175,8 @@ whether you actually submitted, updating the job's status accordingly.
 | Workday: every job's description fetch returns `422 Unprocessable Entity` | Fixed in this version — some tenants' `externalPath` already includes a leading `/job/` segment, which combined with the URL template's own `/job` produced a doubled `.../job/job/...` path. If you're on an older copy, pull the latest `app/sources/workday.py`. |
 | Greenhouse/Lever: `404 Not Found` even though the company definitely exists | The token often isn't the company's name — e.g. DoorDash's Greenhouse token is `doordashusa`, not `doordash`. Some companies have also switched ATS platforms entirely (Netflix moved off Lever). Verify by opening `boards.greenhouse.io/{slug}` or `jobs.lever.co/{slug}` directly in a browser before assuming your config is wrong. |
 | Windows: `pytest` / `python` / `playwright` "is not recognized as the name of a cmdlet..." | Your virtual environment isn't activated in this shell, or the package genuinely isn't installed. Run `.venv\Scripts\Activate.ps1` (PowerShell) or `.venv\Scripts\activate.bat` (cmd.exe) first — you should see `(.venv)` appear in your prompt — then re-run `pip install -r requirements.txt`. If PowerShell refuses to run the activation script with an execution-policy error, run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` first (affects only that terminal session). |
+| Evaluator (Ollama): `ConnectionError: Could not reach Ollama at http://localhost:11434` | Ollama isn't running. Check for its tray icon, or start it manually with `ollama serve`. Also confirm you've pulled the model set in `OLLAMA_MODEL` (`ollama pull llama3.1:8b`) — a model that hasn't been pulled yet fails the same way. |
+| Evaluator (Ollama): very slow, or scores/reasoning look low-quality | Expected on CPU-only hardware and with smaller (8B-class) models — see the Local LLM (Ollama) section above for what tradeoffs to expect. Use `--limit` to test on a handful of jobs before running the full queue. |
 | `psycopg2.OperationalError: connection ... refused` on `localhost:5432` | No Postgres server is running, and `DATABASE_URL` is set (even to the placeholder in `.env.example`). Comment out `DATABASE_URL` in `.env` entirely to fall back to SQLite, or actually start a Postgres server (Docker: `docker run --name job-hunter-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=job_hunter -p 5432:5432 -d postgres:16-alpine`, then set `DATABASE_URL=postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/job_hunter`) |
 
 ---
@@ -226,14 +228,75 @@ that belongs to the Evaluator, not the Hunter.
 Scores every `PENDING_EVALUATION` job against your resume with an LLM and
 marks it `APPROVED_FOR_APPLY` (score > threshold) or `TRASHED`.
 
-**Supports both Anthropic and OpenAI** behind one interface
-(`app/llm/base.py`) — same adapter pattern as the Hunter's sources. Switch
-providers by changing `LLM_PROVIDER` in `.env`; no code changes needed.
+**Supports Anthropic, OpenAI, or a local model via Ollama** behind one
+interface (`app/llm/base.py`) — same adapter pattern as the Hunter's
+sources. Switch providers by changing `LLM_PROVIDER` in `.env`; no code
+changes needed.
 
 `APPROVAL_THRESHOLD` (default 85) is exclusive — a job must score *above*
 it to be approved, matching the original spec. Failed evaluations (bad API
 response, network error) are left `PENDING_EVALUATION` so they retry on
 the next run rather than silently disappearing.
+
+Run against a lot of pending jobs (like after a big Hunter run)? Use
+`--limit` to sanity-check on a small batch before committing to the full
+queue's time/cost:
+
+```bash
+python -m app.evaluator --limit 10
+```
+
+## Local LLM (Ollama)
+
+Free, private, no API key — trades cost for speed and (usually) some
+answer quality versus a cloud provider. Good option if API costs are a
+concern, or you just don't want your resume/job data leaving your machine.
+
+**Setup:**
+
+```bash
+# 1. Install Ollama: https://ollama.com/download
+# 2. Pull a model (one-time, several GB download):
+ollama pull llama3.1:8b
+# 3. Confirm it's running:
+ollama list
+```
+
+Then in `.env`:
+```
+LLM_PROVIDER=ollama
+OLLAMA_MODEL=llama3.1:8b
+```
+
+No API key needed — the adapter (`app/llm/ollama_client.py`) talks to
+Ollama's local `/api/chat` endpoint directly.
+
+**Which model, for your hardware?** As of mid-2026 benchmarks, roughly:
+
+| Your RAM (no dedicated GPU) | Model | Expected speed |
+|---|---|---|
+| 8 GB | `phi4-mini` (3.8B) | ~15-25 tok/s |
+| 16 GB | `llama3.1:8b` (the default above) | ~10-20 tok/s |
+| 16 GB, want faster over better | `qwen3:4b` | faster, somewhat lower quality |
+| 24 GB+ | `gpt-oss:20b` or similar 20B-class | slower per-token, better reasoning |
+
+If you have a dedicated GPU (NVIDIA/AMD), Ollama will use it automatically
+and speeds jump substantially — check with `ollama ps` while a request is
+running to confirm GPU vs. CPU usage.
+
+**Honest tradeoffs to know going in:**
+- Structured output (the JSON score/dropdown-selection schemas) is
+  enforced via constrained decoding at the Ollama/llama.cpp level, so
+  you'll still reliably get valid, schema-conformant JSON — that part
+  doesn't depend on model quality.
+- What *does* depend on model quality: whether the score, reasoning, or
+  drafted answer is actually good. An 8B local model is meaningfully less
+  capable than GPT-4o or Claude for nuanced judgment calls. Review outputs
+  more critically than you might with a cloud provider, especially at
+  first.
+- CPU-only inference is slow. With hundreds or thousands of pending jobs,
+  a full Evaluator run can take a long time — `--limit` is your friend
+  here more than anywhere else in this project.
 
 ## Phase 3 reference — Executor
 
@@ -320,14 +383,15 @@ python -m app.inspect_jobs --status TRASHED --limit 50
 pytest -v
 ```
 
-88 tests, covering all four phases plus their integration:
+96 tests, covering all four phases plus their integration:
 - **Sources** — each adapter (including Workday's pagination and
   detail-fetch failure handling) against fixture data matching that
   provider's own documented response schema
 - **DB / dedup** — upsert logic against an in-memory SQLite DB
-- **LLM clients** — both providers' response parsing against realistic
-  mocked SDK responses, plus a `StubLLMClient` for testing the Evaluator's
-  threshold logic with zero API cost
+- **LLM clients** — all three providers' response parsing against
+  realistic mocked SDK/API responses (Ollama's included, using its native
+  `/api/chat` schema-constrained format), plus a `StubLLMClient` for
+  testing the Evaluator's threshold logic with zero API cost
 - **Field classifier** — pure logic, including negative cases like making
   sure a "Company Name" field never gets filled with your own name
 - **Executor DOM fill** — runs a real (headless) Chromium against a local
@@ -370,6 +434,7 @@ app/
     prompts.py           # shared prompts + JSON schema, same for both providers
     openai_client.py
     anthropic_client.py
+    ollama_client.py       # local model via Ollama, same interface, no API key
     factory.py            # picks provider based on LLM_PROVIDER env var
   rag/
     story_bank.py         # Story schema + loader

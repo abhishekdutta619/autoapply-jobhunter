@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import argparse
 import logging
 import time
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -52,7 +53,7 @@ def evaluate_job(
     )
 
 
-def run() -> None:
+def run(limit: int | None = None) -> None:
     init_db()
     resume_text = load_resume()
     llm_client = get_llm_client()
@@ -63,13 +64,25 @@ def run() -> None:
     failed = 0
 
     try:
-        pending = session.scalars(
-            select(Job).where(Job.status == JobStatus.PENDING_EVALUATION.value)
-        ).all()
+        query = select(Job).where(Job.status == JobStatus.PENDING_EVALUATION.value)
+        if limit is not None:
+            query = query.limit(limit)
+        pending = session.scalars(query).all()
 
         if not pending:
             log.info("No jobs pending evaluation. Run the Hunter first.")
             return
+
+        if limit is not None:
+            total_pending = session.scalar(
+                select(func.count(Job.id)).where(
+                    Job.status == JobStatus.PENDING_EVALUATION.value
+                )
+            )
+            log.info(
+                "Evaluating %d of %d pending jobs (--limit %d set).",
+                len(pending), total_pending, limit,
+            )
 
         for job in pending:
             try:
@@ -96,4 +109,13 @@ def run() -> None:
 
 
 if __name__ == "__main__":
-    run()
+    parser = argparse.ArgumentParser(
+        description="Score PENDING_EVALUATION jobs against your resume via LLM."
+    )
+    parser.add_argument(
+        "--limit", type=int, default=None,
+        help="Only evaluate this many jobs (useful for a first sanity-check "
+        "run before committing to the full pending queue's API cost/time).",
+    )
+    args = parser.parse_args()
+    run(limit=args.limit)
