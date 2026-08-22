@@ -108,7 +108,14 @@ def test_job_flows_correctly_from_hunter_through_evaluator_to_executor(session, 
     # Using the job's real apply_url (not a hardcoded test URL) is the
     # point - it proves Phase 3 correctly consumes what Phase 1 stored.
     with playwright_sync.sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        try:
+            browser = p.chromium.launch(headless=True)
+        except Exception as exc:  # noqa: BLE001
+            # Skip (not fail) if no Chromium binary is installed - same
+            # reasoning as the `page` fixture in test_executor_form_fill.py:
+            # needs `playwright install chromium` run once, which this
+            # sandbox's network restrictions don't allow.
+            pytest.skip(f"Chromium not available in this environment: {exc}")
         page = browser.new_page()
         page.goto(job.apply_url)
 
