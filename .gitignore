@@ -9,3 +9,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+dashboard/node_modules/
+dashboard/dist/
+dashboard/.angular/
