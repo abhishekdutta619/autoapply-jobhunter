@@ -59,9 +59,14 @@ class OllamaEvaluator:
             # slower. Explicitly false here for every model: it's a no-op
             # for non-thinking-capable models like llama3.1:8b.
             "think": False,
+            # keep_alive: 0 forces Ollama to unload the context and free RAM immediately after each request
+            "keep_alive": 0,
             # temperature=0 for determinism - Ollama's own docs recommend
             # this for schema-constrained generation specifically.
-            "options": {"temperature": 0},
+            "options": {
+                "temperature": 0,
+                "num_ctx": 4096,  # Cap context window size to prevent RAM bloat
+            },
         }
         if schema is not None:
             payload["format"] = schema
@@ -104,7 +109,8 @@ class OllamaEvaluator:
     ) -> str:
         content = self._chat(
             ANSWER_SYSTEM_PROMPT,
-            build_answer_prompt(question, story_title, story_text, job_title, job_description),
+            build_answer_prompt(question, story_title,
+                                story_text, job_title, job_description),
         )
         return content.strip()
 
