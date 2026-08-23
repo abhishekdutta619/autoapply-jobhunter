@@ -22,6 +22,11 @@ def get_llm_client() -> LLMClient:
 
         return OllamaEvaluator(base_url=settings.ollama_base_url, model=settings.ollama_model)
 
+    if settings.llm_provider == "gemini":
+        from app.llm.gemini_client import GeminiEvaluator
+
+        return GeminiEvaluator(api_key=settings.gemini_api_key, model=settings.gemini_model)
+
     raise ValueError(
-        f"Unknown LLM_PROVIDER {settings.llm_provider!r}. Use 'openai', 'anthropic', or 'ollama'."
+        f"Unknown LLM_PROVIDER {settings.llm_provider!r}. Use 'openai', 'anthropic', 'ollama', or 'gemini'."
     )

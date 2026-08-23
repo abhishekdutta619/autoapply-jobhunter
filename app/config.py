@@ -38,13 +38,19 @@ class Settings:
     )
 
     # --- Evaluator (Phase 2) ---
-    llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")  # "anthropic" | "openai" | "ollama"
+    llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")  # "anthropic" | "openai" | "ollama" | "gemini"
 
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o")
 
     anthropic_api_key: str | None = os.getenv("ANTHROPIC_API_KEY")
     anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
+
+    # Free tier (Flash-family models): no credit card, no subscription -
+    # get a key at https://aistudio.google.com/apikey. Unrelated to any
+    # paid consumer "Gemini Pro"/Google AI Pro subscription.
+    gemini_api_key: str | None = os.getenv("GEMINI_API_KEY")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     # Local, free, no API key - runs entirely on your own machine via Ollama.
     # Slower than a cloud provider and quality depends on the model you've
@@ -61,6 +67,15 @@ class Settings:
     # None) to restore the original hard-cutoff behavior with no review band.
     review_threshold: int = int(os.getenv("REVIEW_THRESHOLD", "60"))
     eval_request_delay_seconds: float = float(os.getenv("EVAL_REQUEST_DELAY_SECONDS", "1.0"))
+
+    # Optional hard constraints folded into the resume text the Evaluator
+    # sends the LLM (see app/llm/prompts.py's build_constraints_section) -
+    # not a schema change, so every provider picks this up automatically.
+    require_remote: bool = os.getenv("REQUIRE_REMOTE", "false").strip().lower() == "true"
+    # Freeform on purpose - compensation bands vary by currency/market and
+    # a rigid numeric gate would be fragile. e.g. "25-30 LPA in India, or
+    # globally-equivalent for remote international roles".
+    target_compensation: str | None = os.getenv("TARGET_COMPENSATION") or None
 
     # --- Executor (Phase 3) ---
     candidate_profile_path: str = os.getenv("CANDIDATE_PROFILE_PATH", "candidate_profile.json")

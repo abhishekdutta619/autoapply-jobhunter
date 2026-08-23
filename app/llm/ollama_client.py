@@ -50,6 +50,15 @@ class OllamaEvaluator:
                 {"role": "user", "content": user_prompt},
             ],
             "stream": False,
+            # Qwen3 models default to "thinking mode" ON in Ollama - a long
+            # internal chain-of-thought trace before the final answer, which
+            # can add hundreds to thousands of tokens per response. That's
+            # what actually caused ~209s (vs llama3.1:8b's ~70s) on the
+            # first job and 300s timeouts on the rest during testing - not
+            # qwen3:4b's smaller size, which should have made it faster, not
+            # slower. Explicitly false here for every model: it's a no-op
+            # for non-thinking-capable models like llama3.1:8b.
+            "think": False,
             # temperature=0 for determinism - Ollama's own docs recommend
             # this for schema-constrained generation specifically.
             "options": {"temperature": 0},

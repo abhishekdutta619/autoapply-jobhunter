@@ -86,3 +86,19 @@ def test_custom_base_url_is_used():
 
     called_url = mock_post.call_args[0][0]
     assert called_url == "http://192.168.1.50:11434/api/chat"
+
+
+def test_thinking_mode_is_always_disabled():
+    """Qwen3 defaults to thinking mode ON, which generates a long internal
+    reasoning trace before every answer - measured in real use to add
+    ~140s+ per request on CPU-only hardware, and to blow past the 300s
+    timeout entirely on some jobs. think=False must be sent on every
+    request regardless of which model is configured - it's a harmless
+    no-op for non-thinking models like llama3.1:8b, but load-bearing for
+    Qwen3."""
+    with patch("httpx.post", return_value=_mock_response(json.dumps({"score": 50, "reasoning": "x"}))) as mock_post:
+        evaluator = OllamaEvaluator(model="qwen3:4b")
+        evaluator.evaluate_match("resume", "title", "description")
+
+    _, kwargs = mock_post.call_args
+    assert kwargs["json"]["think"] is False
