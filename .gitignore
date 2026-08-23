@@ -12,3 +12,4 @@ __pycache__/
 dashboard/node_modules/
 dashboard/dist/
 dashboard/.angular/
+job_hunter.db.backup
