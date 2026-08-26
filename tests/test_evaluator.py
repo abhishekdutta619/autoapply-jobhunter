@@ -151,6 +151,35 @@ def test_none_review_threshold_reproduces_old_hard_cutoff(session):
     assert job.status == JobStatus.TRASHED.value
 
 
+def test_constraints_appended_to_resume_reach_the_llm_client(session):
+    """Mirrors exactly how run() composes this: resume_text +=
+    build_constraints_section(...) once, before evaluate_job(). Confirms
+    the constraints actually arrive at evaluate_match's `resume` param,
+    not just that build_constraints_section() produces the right string
+    in isolation (covered separately in test_constraints.py)."""
+    from app.llm.prompts import build_constraints_section
+
+    job = _pending_job()
+    session.add(job)
+    session.commit()
+
+    resume_text = "Senior Engineer, 6 years experience"
+    resume_text += build_constraints_section(
+        prefer_remote=True,
+        target_compensation_indian="15-20 LPA",
+        target_compensation_mnc="30-40 LPA",
+    )
+
+    client = StubLLMClient(score=90)
+    evaluate_job(job, client, resume_text, threshold=85)
+
+    passed_resume = client.calls[0][0]
+    assert "Senior Engineer, 6 years experience" in passed_resume
+    assert "PREFERS fully remote" in passed_resume
+    assert "15-20 LPA" in passed_resume
+    assert "30-40 LPA" in passed_resume
+
+
 def test_resume_and_job_content_are_passed_to_llm(session):
     job = _pending_job(title="Data Engineer", description_html="<p>Airflow, dbt</p>")
     session.add(job)
@@ -162,4 +191,7 @@ def test_resume_and_job_content_are_passed_to_llm(session):
     resume_arg, title_arg, description_arg = stub.calls[0]
     assert resume_arg == "my resume"
     assert title_arg == "Data Engineer"
-    assert description_arg == "<p>Airflow, dbt</p>"
+    # HTML gets stripped before reaching the LLM (see app/text_utils.py) -
+    # tags shouldn't survive, the actual content should.
+    assert description_arg == "Airflow, dbt"
+    assert "<p>" not in description_arg

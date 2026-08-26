@@ -11,8 +11,10 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db.models import Job, JobStatus
 from app.db.session import get_session, init_db
+from app.text_utils import strip_html
 from app.llm.base import LLMClient
 from app.llm.factory import get_llm_client
+from app.llm.prompts import build_constraints_section
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("evaluator")
@@ -51,7 +53,7 @@ def evaluate_job(
     result = llm_client.evaluate_match(
         resume=resume_text,
         job_title=job.title,
-        job_description=job.description_html or "",
+        job_description=strip_html(job.description_html),
     )
     job.match_score = result.score
     job.rationale = result.reasoning
@@ -72,6 +74,14 @@ def evaluate_job(
 def run(limit: int | None = None) -> None:
     init_db()
     resume_text = load_resume()
+    # Folded into the resume text itself (not a new evaluate_match()
+    # parameter) so this works identically across all four LLM clients
+    # with zero changes to any of them. No-op ("") if nothing is configured.
+    resume_text += build_constraints_section(
+        settings.prefer_remote,
+        settings.target_compensation_indian,
+        settings.target_compensation_mnc,
+    )
     llm_client = get_llm_client()
     session: Session = get_session()
 

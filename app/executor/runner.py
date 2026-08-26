@@ -24,6 +24,7 @@ from app.llm.factory import get_llm_client
 from app.rag.answer_service import AnswerService
 from app.rag.retriever import StoryRetriever
 from app.rag.story_bank import load_stories
+from app.text_utils import strip_html
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("executor")
@@ -251,7 +252,7 @@ def run() -> None:
                 answer_service=answer_service,
                 dropdown_mapper=dropdown_mapper,
                 job_title=job.title,
-                job_description=job.description_html or "",
+                job_description=strip_html(job.description_html),
             )
             _print_report(filled, skipped)
 

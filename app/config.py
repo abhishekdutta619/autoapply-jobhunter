@@ -50,7 +50,7 @@ class Settings:
     # get a key at https://aistudio.google.com/apikey. Unrelated to any
     # paid consumer "Gemini Pro"/Google AI Pro subscription.
     gemini_api_key: str | None = os.getenv("GEMINI_API_KEY")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.7-flash")
 
     # Local, free, no API key - runs entirely on your own machine via Ollama.
     # Slower than a cloud provider and quality depends on the model you've
@@ -68,14 +68,19 @@ class Settings:
     review_threshold: int = int(os.getenv("REVIEW_THRESHOLD", "60"))
     eval_request_delay_seconds: float = float(os.getenv("EVAL_REQUEST_DELAY_SECONDS", "1.0"))
 
-    # Optional hard constraints folded into the resume text the Evaluator
-    # sends the LLM (see app/llm/prompts.py's build_constraints_section) -
-    # not a schema change, so every provider picks this up automatically.
-    require_remote: bool = os.getenv("REQUIRE_REMOTE", "false").strip().lower() == "true"
-    # Freeform on purpose - compensation bands vary by currency/market and
-    # a rigid numeric gate would be fragile. e.g. "25-30 LPA in India, or
-    # globally-equivalent for remote international roles".
-    target_compensation: str | None = os.getenv("TARGET_COMPENSATION") or None
+    # Soft preference, NOT a hard filter - no job is excluded from scoring
+    # based on this. Remote is the first choice; onsite/hybrid is a valid
+    # second choice and still gets scored primarily on skill fit. See
+    # build_constraints_section() in app/llm/prompts.py for exactly how
+    # this gets phrased to the LLM.
+    prefer_remote: bool = os.getenv("PREFER_REMOTE", "false").strip().lower() == "true"
+
+    # Two separate targets, not one - the LLM judges from the company
+    # name/description which bucket a posting falls into (Indian company
+    # vs multinational/foreign) rather than a rigid rule-based lookup.
+    # Freeform on purpose - compensation bands vary by currency/market.
+    target_compensation_indian: str | None = os.getenv("TARGET_COMPENSATION_INDIAN") or None
+    target_compensation_mnc: str | None = os.getenv("TARGET_COMPENSATION_MNC") or None
 
     # --- Executor (Phase 3) ---
     candidate_profile_path: str = os.getenv("CANDIDATE_PROFILE_PATH", "candidate_profile.json")
