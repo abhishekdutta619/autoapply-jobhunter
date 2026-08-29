@@ -38,7 +38,14 @@ class Settings:
     )
 
     # --- Evaluator (Phase 2) ---
-    llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")  # "anthropic" | "openai" | "ollama" | "gemini"
+    llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")  # "anthropic" | "openai" | "ollama" | "gemini" | "hybrid"
+
+    # Only used when LLM_PROVIDER=hybrid: local_provider handles every job
+    # first (should be a free/unlimited option, i.e. ollama); jobs whose
+    # local score lands in [review_threshold, approval_threshold] get a
+    # second opinion from cloud_provider. See app/llm/hybrid_client.py.
+    hybrid_local_provider: str = os.getenv("HYBRID_LOCAL_PROVIDER", "ollama")
+    hybrid_cloud_provider: str = os.getenv("HYBRID_CLOUD_PROVIDER", "gemini")
 
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o")
