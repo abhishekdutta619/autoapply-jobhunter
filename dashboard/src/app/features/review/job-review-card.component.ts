@@ -58,7 +58,14 @@ function scoreBand(score: number | null): 'high' | 'mid' | 'low' | 'none' {
     </article>
   `,
   styles: `
+    :host {
+      display: flex;
+      height: 100%;
+    }
     .card {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
       background: var(--bg-surface);
       border: 1px solid var(--border);
       border-radius: 10px;
@@ -81,7 +88,7 @@ function scoreBand(score: number | null): 'high' | 'mid' | 'low' | 'none' {
     .card__score-badge--none { background: var(--bg-neutral); color: var(--text-neutral); }
     .card__rationale { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 12px 0; }
     .card__rationale--empty { color: var(--text-muted); font-style: italic; }
-    .card__actions { display: flex; gap: 8px; margin-top: 12px; }
+    .card__actions { display: flex; gap: 8px; margin-top: auto; padding-top: 12px; }
     .card__btn {
       flex: 1;
       padding: 8px 0;
