@@ -4,6 +4,7 @@ import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import httpx
 from google.genai import errors
 
 from app.llm.gemini_client import GeminiEvaluator
@@ -112,6 +113,56 @@ def test_persistent_transient_error_eventually_gives_up():
 
     # stop_after_attempt(4) - should have tried exactly 4 times, not looped forever.
     assert fake_client.models.generate_content.call_count == 4
+
+
+def test_network_level_transport_error_is_retried():
+    """Confirmed via a real run: WinError 10053 (connection aborted by
+    the host) surfaced as an httpx.TransportError, not a
+    google.genai.errors.APIError - the original _is_transient() check
+    (isinstance(exc, errors.APIError)) missed this entirely, so it never
+    got retried at all."""
+    fake_client = MagicMock()
+    fake_client.models.generate_content.side_effect = [
+        httpx.ReadError("WinError 10053: connection aborted"),
+        _fake_response({"score": 60, "reasoning": "ok"}),
+    ]
+
+    with patch("app.llm.gemini_client.genai.Client", return_value=fake_client), \
+         patch("tenacity.nap.time.sleep"):
+        evaluator = GeminiEvaluator(api_key="test-key")
+        result = evaluator.evaluate_match("resume", "title", "description")
+
+    assert result.score == 60
+    assert fake_client.models.generate_content.call_count == 2
+
+
+def test_persistent_network_error_eventually_gives_up_not_infinite():
+    fake_client = MagicMock()
+    fake_client.models.generate_content.side_effect = httpx.ConnectError("connection refused")
+
+    with patch("app.llm.gemini_client.genai.Client", return_value=fake_client), \
+         patch("tenacity.nap.time.sleep"):
+        evaluator = GeminiEvaluator(api_key="test-key")
+        try:
+            evaluator.evaluate_match("resume", "title", "description")
+            assert False, "expected the persistent connection error to eventually raise"
+        except httpx.ConnectError:
+            pass
+
+    assert fake_client.models.generate_content.call_count == 4
+
+
+def test_client_configured_with_bounded_timeout_not_unbounded():
+    """Confirmed via a real run: with no timeout set, one hung connection
+    took ~20 minutes to fail with zero retry attempts in that window.
+    A bounded timeout means tenacity gets a chance to retry much sooner."""
+    with patch("app.llm.gemini_client.genai.Client") as mock_client_cls:
+        GeminiEvaluator(api_key="test-key")
+
+    _, kwargs = mock_client_cls.call_args
+    http_options = kwargs["http_options"]
+    assert http_options.timeout is not None
+    assert http_options.timeout <= 120_000  # generous ceiling: 2 minutes, not 20
 
 
 def test_404_wrong_model_name_fails_fast_without_retrying():

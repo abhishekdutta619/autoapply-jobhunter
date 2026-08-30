@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 
+import httpx
 from google import genai
 from google.genai import errors, types
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
@@ -21,6 +22,15 @@ from app.llm.prompts import (
 
 log = logging.getLogger("llm.gemini")
 
+# Confirmed against a real run: WinError 10053 (connection aborted by the
+# host) surfaced as an httpx.TransportError, not a google.genai.errors
+# .APIError - so it wasn't retried at all, and with no request timeout
+# configured (the SDK's default is unbounded), that single hung
+# connection took ~20 minutes to finally fail. Both gaps fixed here:
+# network-level errors are now retried too, and REQUEST_TIMEOUT_MS caps
+# how long any one attempt can hang before tenacity moves on to a retry.
+REQUEST_TIMEOUT_MS = 60_000  # 60s - generous for a Flash-class classification call, not 20 minutes
+
 # 429 (quota exceeded) and 503 (server overloaded) are both transient -
 # worth retrying with backoff. Everything else (404 wrong model name, 400
 # bad request, 403 bad key) is permanent - retrying just wastes time and
@@ -34,7 +44,13 @@ _TRANSIENT_CODES = {429, 503}
 
 
 def _is_transient(exc: BaseException) -> bool:
-    return isinstance(exc, errors.APIError) and getattr(exc, "code", None) in _TRANSIENT_CODES
+    if isinstance(exc, errors.APIError):
+        return getattr(exc, "code", None) in _TRANSIENT_CODES
+    # Connection drops, read timeouts, protocol errors - confirmed real
+    # (WinError 10053 on Windows), not hypothetical. Always worth a retry;
+    # there's no permanent-vs-transient distinction to make here the way
+    # there is for HTTP status codes.
+    return isinstance(exc, httpx.TransportError)
 
 
 class GeminiEvaluator:
@@ -70,7 +86,10 @@ class GeminiEvaluator:
                 "no subscription needed) at https://aistudio.google.com/apikey "
                 "and add it to your .env file."
             )
-        self._client = genai.Client(api_key=api_key)
+        self._client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(timeout=REQUEST_TIMEOUT_MS),
+        )
         self._model = model
 
     @retry(
