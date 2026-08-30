@@ -21,19 +21,23 @@ import { JobReviewCardComponent } from './job-review-card.component';
         <span class="queue__count">{{ borderlineJobs().length }}</span>
       </h2>
 
-      @for (job of borderlineJobs(); track job.id) {
-        <app-job-review-card
-          [job]="job"
-          (approve)="store.approve($event)"
-          (reject)="store.reject($event)"
-        />
-      } @empty {
+      @if (borderlineJobs().length > 0) {
+        <div class="queue__grid">
+          @for (job of borderlineJobs(); track job.id) {
+            <app-job-review-card
+              [job]="job"
+              (approve)="store.approve($event)"
+              (reject)="store.reject($event)"
+            />
+          }
+        </div>
+      } @else {
         <p class="queue__empty">Nothing waiting on a manual decision right now.</p>
       }
     </div>
   `,
   styles: `
-    .queue { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .queue { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
     .queue__heading {
       font-size: 16px;
       font-weight: 500;
@@ -50,6 +54,11 @@ import { JobReviewCardComponent } from './job-review-card.component';
       padding: 1px 8px;
     }
     .queue__empty { font-size: 13px; color: var(--text-muted); }
+    .queue__grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+      gap: 16px;
+    }
   `,
 })
 export class ReviewContainerComponent implements OnInit {
