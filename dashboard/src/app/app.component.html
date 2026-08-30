@@ -1,4 +1,9 @@
 <nav class="nav">
+  <img
+    class="nav__logo"
+    [src]="themeService.theme() === 'dark' ? 'logo-icon-dark.png' : 'logo-icon-light.png'"
+    alt="AutoApply JobHunter logo"
+  />
   <span class="nav__title">{{ title }}</span>
   <a routerLink="/pipeline" routerLinkActive="nav__link--active" class="nav__link">Pipeline</a>
   <a routerLink="/review" routerLinkActive="nav__link--active" class="nav__link">Review queue</a>
