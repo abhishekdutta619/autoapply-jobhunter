@@ -22,14 +22,11 @@ export interface Job {
   postedAt: string | null; // ISO 8601
   status: JobStatus;
   matchScore: number | null;
-  /**
-   * TODO(backend): app/llm/base.py's EvaluationResult already produces a
-   * `reasoning: str`, but app/evaluator.py currently only persists
-   * `match_score` onto the Job row - the rationale text itself isn't
-   * stored anywhere yet. The review card below needs this to be useful.
-   * Either add a `rationale` column to the jobs table, or a side table
-   * keyed by job_id, before the API layer can return real values here.
-   */
+  // The LLM's raw output field is `reasoning` (see RESULT_SCHEMA in
+  // app/llm/prompts.py) - evaluate_job() maps it to `job.rationale` on
+  // the Job row the moment it's scored, and the API exposes that as
+  // `rationale`. This field, not `reasoning`, is what actually reaches
+  // the dashboard - don't rename it to match the LLM's raw key.
   rationale: string | null;
   scrapedAt: string;
   updatedAt: string;
