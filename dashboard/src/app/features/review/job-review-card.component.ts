@@ -47,17 +47,18 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
   `,
   styles: `
     .card {
-      border: 1px solid #e5e7eb;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
       border-radius: 10px;
       padding: 16px;
       max-width: 420px;
     }
     .card__header { display: flex; justify-content: space-between; gap: 8px; }
-    .card__title { font-size: 15px; font-weight: 500; margin: 0; }
-    .card__company { font-size: 13px; color: #6b7280; margin: 2px 0 0; }
-    .card__score { font-size: 13px; color: #374151; margin: 10px 0 4px; }
-    .card__rationale { font-size: 13px; color: #374151; line-height: 1.5; }
-    .card__rationale--empty { color: #9ca3af; font-style: italic; }
+    .card__title { font-size: 15px; font-weight: 500; margin: 0; color: var(--text-primary); }
+    .card__company { font-size: 13px; color: var(--text-secondary); margin: 2px 0 0; }
+    .card__score { font-size: 13px; color: var(--text-primary); margin: 10px 0 4px; }
+    .card__rationale { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+    .card__rationale--empty { color: var(--text-muted); font-style: italic; }
     .card__actions { display: flex; gap: 8px; margin-top: 12px; }
     .card__btn {
       flex: 1;
@@ -68,10 +69,10 @@ import { StatusBadgeComponent } from '../../shared/components/status-badge/statu
       font-weight: 500;
       cursor: pointer;
     }
-    .card__btn--approve { background: #059669; color: white; }
-    .card__btn--approve:hover { background: #047857; }
-    .card__btn--reject { background: #f3f4f6; color: #374151; }
-    .card__btn--reject:hover { background: #e5e7eb; }
+    .card__btn--approve { background: var(--text-success); color: white; }
+    .card__btn--approve:hover { opacity: 0.85; }
+    .card__btn--reject { background: var(--bg-neutral); color: var(--text-neutral); }
+    .card__btn--reject:hover { background: var(--border-strong); }
   `,
 })
 export class JobReviewCardComponent {

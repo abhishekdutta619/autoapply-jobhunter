@@ -40,15 +40,16 @@ import { JobReviewCardComponent } from './job-review-card.component';
       display: flex;
       align-items: center;
       gap: 8px;
+      color: var(--text-primary);
     }
     .queue__count {
       font-size: 12px;
-      background: #e5e7eb;
-      color: #374151;
+      background: var(--bg-neutral);
+      color: var(--text-neutral);
       border-radius: 999px;
       padding: 1px 8px;
     }
-    .queue__empty { font-size: 13px; color: #9ca3af; }
+    .queue__empty { font-size: 13px; color: var(--text-muted); }
   `,
 })
 export class ReviewContainerComponent implements OnInit {

@@ -1,1 +1,76 @@
 /* You can add global styles to this file, and also import other style files */
+
+:root {
+  --bg-page: #f3f4f6;
+  --bg-surface: #ffffff;
+  --bg-column: #f9fafb;
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+
+  --bg-neutral: #e5e7eb;
+  --text-neutral: #374151;
+  --bg-success: #d1fae5;
+  --text-success: #065f46;
+  --bg-info: #dbeafe;
+  --text-info: #1e40af;
+  --bg-warning: #fef3c7;
+  --text-warning: #92400e;
+  --bg-danger: #fee2e2;
+  --text-danger: #991b1b;
+  --bg-muted: #f3f4f6;
+  --text-mutedbadge: #6b7280;
+
+  --col-pending: #3b82f6;
+  --col-approved: #8b5cf6;
+  --col-applying: #f59e0b;
+  --col-applied: #10b981;
+  --col-failed: #ef4444;
+  --col-trashed: #9ca3af;
+}
+
+[data-theme='dark'] {
+  --bg-page: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-column: #172033;
+  --border: #334155;
+  --border-strong: #475569;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  --bg-neutral: #334155;
+  --text-neutral: #cbd5e1;
+  --bg-success: #064e3b;
+  --text-success: #6ee7b7;
+  --bg-info: #1e3a5f;
+  --text-info: #93c5fd;
+  --bg-warning: #451a03;
+  --text-warning: #fcd34d;
+  --bg-danger: #450a0a;
+  --text-danger: #fca5a5;
+  --bg-muted: #1e293b;
+  --text-mutedbadge: #94a3b8;
+
+  --col-pending: #60a5fa;
+  --col-approved: #a78bfa;
+  --col-applying: #fbbf24;
+  --col-applied: #34d399;
+  --col-failed: #f87171;
+  --col-trashed: #64748b;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+

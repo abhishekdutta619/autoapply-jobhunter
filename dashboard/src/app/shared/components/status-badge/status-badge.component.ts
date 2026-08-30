@@ -32,11 +32,11 @@ const STATUS_CLASSES: Record<JobStatus, string> = {
       font-size: 12px;
       font-weight: 500;
     }
-    .badge--neutral { background: #e5e7eb; color: #374151; }
-    .badge--success { background: #d1fae5; color: #065f46; }
-    .badge--muted   { background: #f3f4f6; color: #6b7280; }
-    .badge--info    { background: #dbeafe; color: #1e40af; }
-    .badge--danger  { background: #fee2e2; color: #991b1b; }
+    .badge--neutral { background: var(--bg-neutral); color: var(--text-neutral); }
+    .badge--success { background: var(--bg-success); color: var(--text-success); }
+    .badge--muted   { background: var(--bg-muted); color: var(--text-mutedbadge); }
+    .badge--info    { background: var(--bg-info); color: var(--text-info); }
+    .badge--danger  { background: var(--bg-danger); color: var(--text-danger); }
   `,
 })
 export class StatusBadgeComponent {

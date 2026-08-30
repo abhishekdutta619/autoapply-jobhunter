@@ -3,20 +3,38 @@
   align-items: center;
   gap: 20px;
   padding: 14px 20px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
   font-family: system-ui, sans-serif;
 }
 .nav__title {
-  font-weight: 500;
+  font-weight: 600;
   font-size: 14px;
   margin-right: auto;
+  color: var(--text-primary);
 }
 .nav__link {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-secondary);
   text-decoration: none;
 }
 .nav__link--active {
-  color: #111827;
+  color: var(--text-primary);
   font-weight: 500;
+}
+.nav__theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-column);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.nav__theme-toggle:hover {
+  background: var(--bg-neutral);
+  color: var(--text-primary);
 }
