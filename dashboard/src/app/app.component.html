@@ -1,10 +1,17 @@
 <nav class="nav">
-  <img
-    class="nav__logo"
-    [src]="themeService.theme() === 'dark' ? 'logo-icon-dark.png' : 'logo-icon-light.png'"
-    alt="AutoApply JobHunter logo"
-  />
-  <span class="nav__title">{{ title }}</span>
+  <div class="nav__brand">
+    <img
+      class="nav__logo"
+      [src]="themeService.theme() === 'dark' ? 'logo-icon-dark.png' : 'logo-icon-light.png'"
+      alt="AutoApply JobHunter logo"
+    />
+    <div class="nav__wordmark">
+      <div class="nav__wordmark-main">
+        <span class="nav__wordmark-muted">Auto</span><span class="nav__wordmark-solid">Apply</span>
+      </div>
+      <div class="nav__wordmark-sub">JOB HUNTER</div>
+    </div>
+  </div>
   <a routerLink="/pipeline" routerLinkActive="nav__link--active" class="nav__link">Pipeline</a>
   <a routerLink="/review" routerLinkActive="nav__link--active" class="nav__link">Review queue</a>
   <button

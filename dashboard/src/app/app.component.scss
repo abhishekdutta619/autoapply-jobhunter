@@ -7,15 +7,38 @@
   background: var(--bg-surface);
   font-family: system-ui, sans-serif;
 }
+.nav__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: auto;
+}
 .nav__logo {
   width: 26px;
   height: 26px;
 }
-.nav__title {
-  font-weight: 600;
-  font-size: 14px;
-  margin-right: auto;
+.nav__wordmark {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+.nav__wordmark-main {
+  font-size: 15px;
+}
+.nav__wordmark-muted {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+.nav__wordmark-solid {
   color: var(--text-primary);
+  font-weight: 700;
+}
+.nav__wordmark-sub {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-top: 3px;
 }
 .nav__link {
   font-size: 13px;

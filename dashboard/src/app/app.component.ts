@@ -11,6 +11,5 @@ import { ThemeService } from './core/services/theme.service';
   styleUrl: './app.component.scss',
 })
 export class AppComponent {
-  protected readonly title = 'Auto Apply Job Hunter';
   protected readonly themeService = inject(ThemeService);
 }
