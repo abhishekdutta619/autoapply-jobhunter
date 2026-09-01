@@ -3,9 +3,11 @@ from __future__ import annotations
 import logging
 import threading
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app import hunter
+from app.api.deps import require_owner
+from app.db.models import User
 
 log = logging.getLogger("api.hunter")
 router = APIRouter(prefix="/api/hunter", tags=["hunter"])
@@ -29,7 +31,7 @@ def _run_hunter_in_background() -> None:
 
 
 @router.post("/trigger")
-def trigger_hunter_run() -> dict[str, bool]:
+def trigger_hunter_run(user: User = Depends(require_owner)) -> dict[str, bool]:
     global _run_in_progress
     with _run_lock:
         if _run_in_progress:
@@ -42,6 +44,6 @@ def trigger_hunter_run() -> dict[str, bool]:
 
 
 @router.get("/status")
-def hunter_status() -> dict[str, bool]:
+def hunter_status(user: User = Depends(require_owner)) -> dict[str, bool]:
     with _run_lock:
         return {"running": _run_in_progress}

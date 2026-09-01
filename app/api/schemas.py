@@ -38,3 +38,11 @@ class JobStatusUpdate(BaseModel):
     / .reject() in the Angular client, which both PATCH a bare {status}."""
 
     status: JobStatus
+
+
+class UserOut(CamelModel):
+    id: int
+    email: str
+    name: str | None
+    avatar_url: str | None
+    is_owner: bool

@@ -38,14 +38,7 @@ class Settings:
     )
 
     # --- Evaluator (Phase 2) ---
-    llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")  # "anthropic" | "openai" | "ollama" | "gemini" | "hybrid"
-
-    # Only used when LLM_PROVIDER=hybrid: local_provider handles every job
-    # first (should be a free/unlimited option, i.e. ollama); jobs whose
-    # local score lands in [review_threshold, approval_threshold] get a
-    # second opinion from cloud_provider. See app/llm/hybrid_client.py.
-    hybrid_local_provider: str = os.getenv("HYBRID_LOCAL_PROVIDER", "ollama")
-    hybrid_cloud_provider: str = os.getenv("HYBRID_CLOUD_PROVIDER", "gemini")
+    llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")  # "anthropic" | "openai" | "ollama" | "gemini"
 
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o")
@@ -57,7 +50,7 @@ class Settings:
     # get a key at https://aistudio.google.com/apikey. Unrelated to any
     # paid consumer "Gemini Pro"/Google AI Pro subscription.
     gemini_api_key: str | None = os.getenv("GEMINI_API_KEY")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.7-flash")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     # Local, free, no API key - runs entirely on your own machine via Ollama.
     # Slower than a cloud provider and quality depends on the model you've
@@ -75,19 +68,34 @@ class Settings:
     review_threshold: int = int(os.getenv("REVIEW_THRESHOLD", "60"))
     eval_request_delay_seconds: float = float(os.getenv("EVAL_REQUEST_DELAY_SECONDS", "1.0"))
 
-    # Soft preference, NOT a hard filter - no job is excluded from scoring
-    # based on this. Remote is the first choice; onsite/hybrid is a valid
-    # second choice and still gets scored primarily on skill fit. See
-    # build_constraints_section() in app/llm/prompts.py for exactly how
-    # this gets phrased to the LLM.
-    prefer_remote: bool = os.getenv("PREFER_REMOTE", "false").strip().lower() == "true"
+    # Optional hard constraints folded into the resume text the Evaluator
+    # sends the LLM (see app/llm/prompts.py's build_constraints_section) -
+    # not a schema change, so every provider picks this up automatically.
+    require_remote: bool = os.getenv("REQUIRE_REMOTE", "false").strip().lower() == "true"
+    # Freeform on purpose - compensation bands vary by currency/market and
+    # a rigid numeric gate would be fragile. e.g. "25-30 LPA in India, or
+    # globally-equivalent for remote international roles".
+    target_compensation: str | None = os.getenv("TARGET_COMPENSATION") or None
 
-    # Two separate targets, not one - the LLM judges from the company
-    # name/description which bucket a posting falls into (Indian company
-    # vs multinational/foreign) rather than a rigid rule-based lookup.
-    # Freeform on purpose - compensation bands vary by currency/market.
-    target_compensation_indian: str | None = os.getenv("TARGET_COMPENSATION_INDIAN") or None
-    target_compensation_mnc: str | None = os.getenv("TARGET_COMPENSATION_MNC") or None
+    # --- Auth (Google/GitHub OAuth login for the dashboard) ---
+    # The one account newly-scraped/evaluated jobs are always attributed
+    # to (see app/auth.py's get_or_create_owner). Anyone else who signs
+    # in gets a real account but a genuinely empty dashboard.
+    owner_email: str = os.getenv("OWNER_EMAIL", "")
+
+    google_client_id: str | None = os.getenv("GOOGLE_CLIENT_ID") or None
+    google_client_secret: str | None = os.getenv("GOOGLE_CLIENT_SECRET") or None
+    github_client_id: str | None = os.getenv("GITHUB_CLIENT_ID") or None
+    github_client_secret: str | None = os.getenv("GITHUB_CLIENT_SECRET") or None
+
+    # Signs the session cookie - not a secret shared with any provider,
+    # just needs to be long and random. The insecure default is fine for
+    # a first `ng serve` but every real login session becomes worthless
+    # (and forgeable) if you never override it - see .env.example.
+    session_secret_key: str = os.getenv("SESSION_SECRET_KEY", "dev-insecure-change-me")
+
+    # Where the OAuth callback sends the browser after login succeeds.
+    frontend_base_url: str = os.getenv("FRONTEND_BASE_URL", "http://localhost:4200")
 
     # --- Executor (Phase 3) ---
     candidate_profile_path: str = os.getenv("CANDIDATE_PROFILE_PATH", "candidate_profile.json")

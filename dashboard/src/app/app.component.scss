@@ -65,3 +65,35 @@
   background: var(--bg-neutral);
   color: var(--text-primary);
 }
+.nav__user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav__avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+.nav__avatar--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--col-approved);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+}
+.nav__logout {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.nav__logout:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}

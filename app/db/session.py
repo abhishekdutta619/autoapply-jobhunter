@@ -17,6 +17,7 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False, future=True)
 # list of (column, DDL type) pairs, applied idempotently on every startup.
 _COLUMN_MIGRATIONS: list[tuple[str, str]] = [
     ("rationale", "TEXT"),
+    ("user_id", "INTEGER"),
 ]
 
 
@@ -31,11 +32,34 @@ def _migrate_missing_columns() -> None:
                 conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {column_name} {ddl_type}"))
 
 
+def _backfill_owner_on_jobs() -> None:
+    """Jobs created before the user_id column existed have user_id=NULL.
+    Attribute all of them to the owner account (see app/auth.py) rather
+    than leaving them ownerless and invisible to everyone, including you."""
+    from app.auth import get_or_create_owner  # local import: app.auth needs
+    # nothing from this module, so this just avoids an unnecessary
+    # module-load-time dependency in the common case (a fresh DB with no
+    # legacy rows to backfill) rather than a real circular import.
+
+    session = SessionLocal()
+    try:
+        owner = get_or_create_owner(session)
+        session.execute(
+            text("UPDATE jobs SET user_id = :owner_id WHERE user_id IS NULL"),
+            {"owner_id": owner.id},
+        )
+        session.commit()
+    finally:
+        session.close()
+
+
 def init_db() -> None:
-    """Create tables if they don't exist yet, and patch missing columns
-    onto tables that do. Safe to call on every startup."""
+    """Create tables if they don't exist yet, patch missing columns onto
+    tables that do, and make sure every job has an owner. Safe to call on
+    every startup."""
     Base.metadata.create_all(engine)
     _migrate_missing_columns()
+    _backfill_owner_on_jobs()
 
 
 def get_session() -> Session:

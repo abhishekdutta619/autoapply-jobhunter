@@ -5,6 +5,7 @@ import time
 
 from sqlalchemy import select
 
+from app.auth import get_or_create_owner
 from app.config import settings
 from app.db.models import Job, JobStatus
 from app.db.session import get_session, init_db
@@ -26,7 +27,7 @@ SOURCE_COMPANIES: list[tuple[JobSource, list[str]]] = [
 ]
 
 
-def upsert_job(session, raw: RawJob) -> bool:
+def upsert_job(session, raw: RawJob, owner_id: int) -> bool:
     """Insert a new job, or update a changed one. Returns True if it was new."""
     existing = session.scalar(
         select(Job).where(Job.source == raw.source, Job.external_id == raw.external_id)
@@ -34,6 +35,7 @@ def upsert_job(session, raw: RawJob) -> bool:
     if existing is None:
         session.add(
             Job(
+                user_id=owner_id,
                 source=raw.source,
                 external_id=raw.external_id,
                 title=raw.title,
@@ -60,6 +62,7 @@ def upsert_job(session, raw: RawJob) -> bool:
 def run() -> None:
     init_db()
     session = get_session()
+    owner = get_or_create_owner(session)
 
     total_new = 0
     total_seen = 0
@@ -77,7 +80,7 @@ def run() -> None:
 
                 new_count = 0
                 for raw in raw_jobs:
-                    if upsert_job(session, raw):
+                    if upsert_job(session, raw, owner.id):
                         new_count += 1
                 session.commit()
 

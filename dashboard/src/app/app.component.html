@@ -12,8 +12,12 @@
       <div class="nav__wordmark-sub">JOB HUNTER</div>
     </div>
   </div>
-  <a routerLink="/pipeline" routerLinkActive="nav__link--active" class="nav__link">Pipeline</a>
-  <a routerLink="/review" routerLinkActive="nav__link--active" class="nav__link">Review queue</a>
+
+  @if (authService.status() === 'authenticated') {
+    <a routerLink="/pipeline" routerLinkActive="nav__link--active" class="nav__link">Pipeline</a>
+    <a routerLink="/review" routerLinkActive="nav__link--active" class="nav__link">Review queue</a>
+  }
+
   <button
     type="button"
     class="nav__theme-toggle"
@@ -31,6 +35,17 @@
       </svg>
     }
   </button>
+
+  @if (authService.status() === 'authenticated' && authService.user(); as user) {
+    <div class="nav__user">
+      @if (user.avatarUrl) {
+        <img class="nav__avatar" [src]="user.avatarUrl" [alt]="user.name ?? user.email" />
+      } @else {
+        <span class="nav__avatar nav__avatar--fallback">{{ (user.name ?? user.email).charAt(0).toUpperCase() }}</span>
+      }
+      <button type="button" class="nav__logout" (click)="authService.logout()">Log out</button>
+    </div>
+  }
 </nav>
 
 <router-outlet />
