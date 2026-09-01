@@ -79,6 +79,7 @@ async def callback(provider: str, request: Request, db: Session = Depends(get_db
         name = profile.get("name")
         avatar_url = profile.get("picture")
         provider_id = profile.get("sub")
+        github_username = None
     elif provider == "github":
         resp = await client.get("user", token=token)
         profile = resp.json()
@@ -91,13 +92,14 @@ async def callback(provider: str, request: Request, db: Session = Depends(get_db
             emails = emails_resp.json()
             primary = next((e for e in emails if e.get("primary")), emails[0] if emails else None)
             email = primary["email"] if primary else None
-        name = profile.get("name") or profile.get("login")
+        github_username = profile.get("login")
+        name = profile.get("name") or github_username
         avatar_url = profile.get("avatar_url")
         provider_id = str(profile.get("id"))
     else:
         raise HTTPException(status_code=404, detail=f"Unknown provider: {provider}")
 
-    if not email:
+    if not email and not github_username:
         return RedirectResponse(f"{settings.frontend_base_url}/login?error=no_email")
 
     user = get_or_create_user(
@@ -107,6 +109,7 @@ async def callback(provider: str, request: Request, db: Session = Depends(get_db
         avatar_url=avatar_url,
         provider=provider,
         provider_id=provider_id,
+        github_username=github_username,
     )
     request.session["user_id"] = user.id
     return RedirectResponse(settings.frontend_base_url)

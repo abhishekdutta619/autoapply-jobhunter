@@ -82,6 +82,13 @@ class Settings:
     # to (see app/auth.py's get_or_create_owner). Anyone else who signs
     # in gets a real account but a genuinely empty dashboard.
     owner_email: str = os.getenv("OWNER_EMAIL", "")
+    # Alternative/additional way to identify the owner, specifically for
+    # GitHub logins - email matching is fragile there (many accounts hide
+    # their email, and figuring out which address the API will actually
+    # return takes digging), whereas your GitHub username is something
+    # you already know for certain. If either this or OWNER_EMAIL matches
+    # the account logging in, it's treated as the owner.
+    owner_github_username: str | None = os.getenv("OWNER_GITHUB_USERNAME") or None
 
     google_client_id: str | None = os.getenv("GOOGLE_CLIENT_ID") or None
     google_client_secret: str | None = os.getenv("GOOGLE_CLIENT_SECRET") or None
