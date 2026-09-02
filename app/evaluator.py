@@ -91,7 +91,10 @@ SKILL_KEYWORDS = [
     "site reliability", "platform engineer", "frontend", "front-end",
     "front end", "backend", "back-end", "back end", "full stack",
     "fullstack", "ui developer", "ux developer", "single page application",
-    "progressive web app", "api development", "sdk",
+    "progressive web app", "api development", "sdk", "framework", "library", 
+    "open source","forward engineering", "product engineer", "technical lead", 
+    "tech lead", "ai developer", "ai engineer", "machine learning", "llm", 
+    "rag", "retrieval-augmented generation", "vector database",
 ]
 
 _WORD_RE_CACHE: dict[str, re.Pattern] = {}
