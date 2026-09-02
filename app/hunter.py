@@ -13,6 +13,8 @@ from app.sources.ashby import AshbySource
 from app.sources.base import JobSource, RawJob
 from app.sources.greenhouse import GreenhouseSource
 from app.sources.lever import LeverSource
+from app.sources.smartrecruiters import SmartRecruitersSource
+from app.sources.workable import WorkableSource
 from app.sources.workday import WorkdaySource
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -24,6 +26,8 @@ SOURCE_COMPANIES: list[tuple[JobSource, list[str]]] = [
     (LeverSource(), settings.lever_companies),
     (AshbySource(), settings.ashby_companies),
     (WorkdaySource(), settings.workday_companies),
+    (SmartRecruitersSource(), settings.smartrecruiters_companies),
+    (WorkableSource(), settings.workable_companies),
 ]
 
 

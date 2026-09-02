@@ -37,6 +37,22 @@ class Settings:
         os.getenv("WORKDAY_DETAIL_DELAY_SECONDS", "0.5")
     )
 
+    smartrecruiters_companies: list[str] = _split_csv(os.getenv("SMARTRECRUITERS_COMPANIES"))
+    # Same shape as Workday's toggle - SmartRecruiters' list endpoint also
+    # doesn't include the description, only the per-posting detail
+    # endpoint does (see app/sources/smartrecruiters.py).
+    smartrecruiters_fetch_descriptions: bool = (
+        os.getenv("SMARTRECRUITERS_FETCH_DESCRIPTIONS", "true").lower() == "true"
+    )
+    smartrecruiters_detail_delay_seconds: float = float(
+        os.getenv("SMARTRECRUITERS_DETAIL_DELAY_SECONDS", "0.5")
+    )
+
+    # Workable's public widget endpoint returns the full description in
+    # the same call as the listing (?details=true) - no per-job detail
+    # fetch or extra delay setting needed, unlike Workday/SmartRecruiters.
+    workable_companies: list[str] = _split_csv(os.getenv("WORKABLE_COMPANIES"))
+
     # --- Evaluator (Phase 2) ---
     llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")  # "anthropic" | "openai" | "ollama" | "gemini" | "hybrid"
 
