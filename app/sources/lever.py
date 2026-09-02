@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from app.sources._retry import RETRY_TRANSIENT_ONLY
 from app.sources.base import RawJob
 
 BASE_URL = "https://api.lever.co/v0/postings/{company}"
@@ -25,7 +26,11 @@ class LeverSource:
 
     name = "lever"
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=20))
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=20),
+        retry=RETRY_TRANSIENT_ONLY,
+    )
     def fetch_jobs(self, company_slug: str) -> list[RawJob]:
         url = BASE_URL.format(company=company_slug)
         response = httpx.get(url, params={"mode": "json"}, timeout=20.0)

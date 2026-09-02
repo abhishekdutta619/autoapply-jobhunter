@@ -7,6 +7,7 @@ import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
+from app.sources._retry import RETRY_TRANSIENT_ONLY
 from app.sources.base import RawJob
 
 # Workday has no documented public API. Career sites are single-page apps
@@ -73,7 +74,11 @@ def _normalize_external_path_for_detail(external_path: str) -> str:
 class WorkdaySource:
     name = "workday"
 
-    @retry(stop=stop_after_attempt(4), wait=wait_exponential(multiplier=2, min=4, max=60))
+    @retry(
+        stop=stop_after_attempt(4),
+        wait=wait_exponential(multiplier=2, min=4, max=60),
+        retry=RETRY_TRANSIENT_ONLY,
+    )
     def _post_list_page(self, company: WorkdayCompany, offset: int) -> dict:
         url = LIST_URL.format(tenant=company.tenant, wd_host=company.wd_host, site=company.site)
         response = httpx.post(
@@ -85,7 +90,11 @@ class WorkdaySource:
         response.raise_for_status()
         return response.json()
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=2, min=4, max=30))
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=2, min=4, max=30),
+        retry=RETRY_TRANSIENT_ONLY,
+    )
     def _fetch_description(self, company: WorkdayCompany, external_path: str) -> str | None:
         normalized_path = _normalize_external_path_for_detail(external_path)
         url = DETAIL_URL.format(

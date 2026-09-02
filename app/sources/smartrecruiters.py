@@ -7,6 +7,7 @@ import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
+from app.sources._retry import RETRY_TRANSIENT_ONLY
 from app.sources.base import RawJob
 
 # https://developers.smartrecruiters.com/docs/overview - public, unauthenticated
@@ -63,14 +64,22 @@ class SmartRecruitersSource:
 
     name = "smartrecruiters"
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=20))
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=20),
+        retry=RETRY_TRANSIENT_ONLY,
+    )
     def _fetch_page(self, company_slug: str, offset: int) -> dict:
         url = LIST_URL.format(company=company_slug)
         response = httpx.get(url, params={"offset": offset, "limit": PAGE_SIZE}, timeout=20.0)
         response.raise_for_status()
         return response.json()
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=20))
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=20),
+        retry=RETRY_TRANSIENT_ONLY,
+    )
     def _fetch_description(self, company_slug: str, posting_id: str) -> str | None:
         url = DETAIL_URL.format(company=company_slug, posting_id=posting_id)
         response = httpx.get(url, timeout=20.0)

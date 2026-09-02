@@ -3,6 +3,8 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import httpx
+import pytest
+import tenacity
 
 from app.config import settings
 from app.sources.ashby import AshbySource
@@ -428,3 +430,37 @@ def test_workable_adapter_skips_unpublished_jobs():
         jobs = WorkableSource().fetch_jobs("acme")
 
     assert jobs == []
+
+
+# --- Retry behavior: don't retry permanent errors, do retry transient ones ---
+# See app/sources/_retry.py - motivated directly by a production run where
+# ~30 misconfigured company entries each burned 10-20+ seconds retrying a
+# 404/401/422 that could never succeed no matter how many times it's retried.
+
+def _error_response(status_code: int) -> httpx.Response:
+    request = httpx.Request("GET", "https://example.invalid")
+    return httpx.Response(status_code=status_code, request=request)
+
+
+def test_greenhouse_adapter_fails_fast_on_404():
+    """A 404 means the board doesn't exist - retrying can't fix that, so
+    this should cost exactly one request, not the full retry budget."""
+    with patch("httpx.get", return_value=_error_response(404)) as mock_get:
+        with pytest.raises(httpx.HTTPStatusError):
+            GreenhouseSource().fetch_jobs("does-not-exist")
+
+    assert mock_get.call_count == 1
+
+
+def test_greenhouse_adapter_retries_on_server_error():
+    """A 503 is plausibly transient - the same request might succeed a
+    few seconds later - so this should exhaust the full retry budget.
+    tenacity wraps the final failure in its own RetryError (this is what
+    "RetryError[<Future ... raised HTTPStatusError>]" in the production
+    log actually is - the retries were genuinely happening, just for
+    errors where they could never help)."""
+    with patch("httpx.get", return_value=_error_response(503)) as mock_get, patch("time.sleep"):
+        with pytest.raises(tenacity.RetryError):
+            GreenhouseSource().fetch_jobs("some-company")
+
+    assert mock_get.call_count == 3

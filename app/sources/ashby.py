@@ -6,6 +6,7 @@ from datetime import datetime
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from app.sources._retry import RETRY_TRANSIENT_ONLY
 from app.sources.base import RawJob
 
 BASE_URL = "https://api.ashbyhq.com/posting-api/job-board/{board_name}"
@@ -40,7 +41,11 @@ class AshbySource:
 
     name = "ashby"
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=20))
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=20),
+        retry=RETRY_TRANSIENT_ONLY,
+    )
     def fetch_jobs(self, company_slug: str) -> list[RawJob]:
         url = BASE_URL.format(board_name=company_slug)
         response = httpx.get(url, params={"includeCompensation": "false"}, timeout=20.0)

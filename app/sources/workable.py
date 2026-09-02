@@ -5,6 +5,7 @@ from datetime import datetime
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from app.sources._retry import RETRY_TRANSIENT_ONLY
 from app.sources.base import RawJob
 
 # The same public endpoint Workable's own embeddable careers widget calls
@@ -33,7 +34,11 @@ class WorkableSource:
 
     name = "workable"
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=20))
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=20),
+        retry=RETRY_TRANSIENT_ONLY,
+    )
     def fetch_jobs(self, company_slug: str) -> list[RawJob]:
         url = BASE_URL.format(account=company_slug)
         response = httpx.get(url, params={"details": "true"}, timeout=20.0)
