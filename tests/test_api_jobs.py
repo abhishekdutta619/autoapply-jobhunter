@@ -12,7 +12,15 @@ from fastapi.testclient import TestClient
 def client(monkeypatch):
     """Fresh temp SQLite DB per test, with config/session/api modules
     reloaded against it so nothing leaks between tests or touches a
-    real job_hunter.db."""
+    real job_hunter.db.
+
+    /api/jobs now requires an authenticated user (see app/api/deps.py's
+    get_current_user) and scopes every query to that user's own jobs -
+    this fixture overrides that dependency to a fixed test user instead
+    of driving a real OAuth flow, which is what FastAPI's own testing
+    docs recommend dependency overrides for. _insert_job's default
+    user_id matches this fixture's user.id so inserted jobs are actually
+    visible to it."""
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{path}")
@@ -28,9 +36,26 @@ def client(monkeypatch):
     import app.api.main as main_module
     importlib.reload(main_module)
 
+    from app.db.models import Base, User
+
+    # Base.metadata.create_all(), not session_module.init_db() - init_db()
+    # also runs the owner-bootstrap/backfill step, which requires
+    # OWNER_EMAIL to be set (see app/auth.py's get_or_create_owner) and
+    # isn't needed here; these tests manage their own fixed test user.
+    Base.metadata.create_all(session_module.engine)
+
+    session = session_module.get_session()
+    test_user = User(id=1, email="test@example.com", name="Test User", is_owner=True)
+    session.add(test_user)
+    session.commit()
+    session.close()
+
+    main_module.app.dependency_overrides[deps_module.get_current_user] = lambda: test_user
+
     with TestClient(main_module.app) as test_client:
         yield test_client, session_module
 
+    main_module.app.dependency_overrides.clear()
     # See test_db_migration.py for why this matters on Windows: an
     # undisposed SQLAlchemy engine holds the SQLite file open, and
     # os.unlink() below raises PermissionError [WinError 32] until
@@ -49,6 +74,7 @@ def _insert_job(session_module, **overrides):
         company="Doordash",
         apply_url="https://example.com/apply",
         status=JobStatus.PENDING_EVALUATION.value,
+        user_id=1,  # matches the client fixture's overridden test user
     )
     defaults.update(overrides)
     session = session_module.get_session()

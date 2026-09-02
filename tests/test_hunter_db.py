@@ -35,7 +35,7 @@ def _raw(**overrides):
 
 
 def test_new_job_is_inserted_as_pending(session):
-    was_new = upsert_job(session, _raw())
+    was_new = upsert_job(session, _raw(), owner_id=1)
     session.commit()
 
     assert was_new is True
@@ -45,9 +45,9 @@ def test_new_job_is_inserted_as_pending(session):
 
 
 def test_same_source_and_external_id_is_not_duplicated(session):
-    upsert_job(session, _raw())
+    upsert_job(session, _raw(), owner_id=1)
     session.commit()
-    upsert_job(session, _raw())
+    upsert_job(session, _raw(), owner_id=1)
     session.commit()
 
     count = session.scalar(select(Job)).id
@@ -56,14 +56,14 @@ def test_same_source_and_external_id_is_not_duplicated(session):
 
 
 def test_re_seen_job_updates_fields_without_resetting_status(session):
-    upsert_job(session, _raw(title="Old Title"))
+    upsert_job(session, _raw(title="Old Title"), owner_id=1)
     session.commit()
 
     job = session.scalar(select(Job))
     job.status = JobStatus.APPROVED_FOR_APPLY.value
     session.commit()
 
-    was_new = upsert_job(session, _raw(title="New Title"))
+    was_new = upsert_job(session, _raw(title="New Title"), owner_id=1)
     session.commit()
 
     assert was_new is False
@@ -74,8 +74,8 @@ def test_re_seen_job_updates_fields_without_resetting_status(session):
 
 
 def test_same_external_id_different_source_is_distinct(session):
-    upsert_job(session, _raw(source="greenhouse", external_id="123"))
-    upsert_job(session, _raw(source="lever", external_id="123"))
+    upsert_job(session, _raw(source="greenhouse", external_id="123"), owner_id=1)
+    upsert_job(session, _raw(source="lever", external_id="123"), owner_id=1)
     session.commit()
 
     all_jobs = session.scalars(select(Job)).all()

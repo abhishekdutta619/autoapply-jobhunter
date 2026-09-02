@@ -83,7 +83,7 @@ def test_job_flows_correctly_from_hunter_through_evaluator_to_executor(session, 
         description_html="5+ years Python, distributed systems experience required.",
         apply_url=f"file://{FORM_PATH}",
     )
-    was_new = upsert_job(session, raw_job)
+    was_new = upsert_job(session, raw_job, owner_id=1)
     session.commit()
     assert was_new is True
 
@@ -153,7 +153,7 @@ def test_low_score_job_never_reaches_the_executor_stage(session):
         company="acme",
         apply_url="https://example.com/apply",
     )
-    upsert_job(session, raw_job)
+    upsert_job(session, raw_job, owner_id=1)
     session.commit()
     job = session.scalar(select(Job).where(Job.external_id == "e2e-low-score"))
 

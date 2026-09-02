@@ -15,3 +15,4 @@ dashboard/.angular/
 job_hunter.db.backup
 hunter.log
 hybrid_test.log
+prefilter_test.log
