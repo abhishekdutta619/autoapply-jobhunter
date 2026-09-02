@@ -38,7 +38,15 @@ class Settings:
     )
 
     # --- Evaluator (Phase 2) ---
-    llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")  # "anthropic" | "openai" | "ollama" | "gemini"
+    llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")  # "anthropic" | "openai" | "ollama" | "gemini" | "hybrid"
+
+    # Only used when llm_provider == "hybrid": the local model scores every
+    # job first (free/unlimited); only jobs landing in the review band
+    # ([REVIEW_THRESHOLD, APPROVAL_THRESHOLD], same two settings below - no
+    # separate hybrid-specific threshold) get a second opinion from the
+    # cloud model named here.
+    hybrid_local_provider: str = os.getenv("HYBRID_LOCAL_PROVIDER", "ollama")
+    hybrid_cloud_provider: str = os.getenv("HYBRID_CLOUD_PROVIDER", "gemini")
 
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o")
@@ -68,14 +76,15 @@ class Settings:
     review_threshold: int = int(os.getenv("REVIEW_THRESHOLD", "60"))
     eval_request_delay_seconds: float = float(os.getenv("EVAL_REQUEST_DELAY_SECONDS", "1.0"))
 
-    # Optional hard constraints folded into the resume text the Evaluator
-    # sends the LLM (see app/llm/prompts.py's build_constraints_section) -
-    # not a schema change, so every provider picks this up automatically.
-    require_remote: bool = os.getenv("REQUIRE_REMOTE", "false").strip().lower() == "true"
-    # Freeform on purpose - compensation bands vary by currency/market and
-    # a rigid numeric gate would be fragile. e.g. "25-30 LPA in India, or
-    # globally-equivalent for remote international roles".
-    target_compensation: str | None = os.getenv("TARGET_COMPENSATION") or None
+    # --- Optional hard constraints folded into the resume text the Evaluator
+    #     sends the LLM (see app/llm/prompts.py's build_constraints_section) -
+    #     not a schema change, so every provider picks this up automatically.
+    prefer_remote: bool = os.getenv("PREFER_REMOTE", "false").strip().lower() == "true"
+    # Freeform on purpose - compensation bands vary by currency/market and a
+    # rigid numeric gate would be fragile. Split by company type: the LLM
+    # judges Indian-vs-MNC from context (see build_constraints_section).
+    target_compensation_indian: str | None = os.getenv("TARGET_COMPENSATION_INDIAN") or None
+    target_compensation_mnc: str | None = os.getenv("TARGET_COMPENSATION_MNC") or None
 
     # --- Auth (Google/GitHub OAuth login for the dashboard) ---
     # The one account newly-scraped/evaluated jobs are always attributed
