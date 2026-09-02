@@ -41,7 +41,7 @@
       @if (user.avatarUrl) {
         <img class="nav__avatar" [src]="user.avatarUrl" [alt]="user.name ?? user.email" />
       } @else {
-        <span class="nav__avatar nav__avatar--fallback">{{ (user.name ?? user.email).charAt(0).toUpperCase() }}</span>
+        <span class="nav__avatar nav__avatar--fallback">{{ (user.name ?? user.email ?? '?').charAt(0).toUpperCase() }}</span>
       }
       <button type="button" class="nav__logout" (click)="authService.logout()">Log out</button>
     </div>

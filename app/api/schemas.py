@@ -42,7 +42,7 @@ class JobStatusUpdate(BaseModel):
 
 class UserOut(CamelModel):
     id: int
-    email: str
+    email: str | None
     name: str | None
     avatar_url: str | None
     is_owner: bool

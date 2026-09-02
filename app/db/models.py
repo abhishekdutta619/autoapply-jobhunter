@@ -39,9 +39,24 @@ class User(Base):
     """
 
     __tablename__ = "users"
+    __table_args__ = (
+        # A given (provider, provider_id) pair identifies exactly one real
+        # account. This is the fallback identity used when email is None
+        # (GitHub can return no email at all, not just a non-owner one -
+        # see app/auth.py) - without it, every login from that account
+        # would create a brand new row instead of finding the existing one.
+        # Multiple NULL/NULL rows are fine under standard SQL unique
+        # semantics (only ever the one pre-login owner bootstrap row).
+        UniqueConstraint("provider", "provider_id", name="uq_users_provider_provider_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    # Nullable: GitHub's user:email scope doesn't guarantee a usable email
+    # comes back (private + no public entry + a hidden primary). email
+    # stays the preferred identity when present, but a login can't be
+    # forced to fail (or crash on commit) just because it's missing - see
+    # app/auth.py's provider/provider_id fallback lookup.
+    email: Mapped[str | None] = mapped_column(String(320), unique=True, index=True, nullable=True)
     name: Mapped[str | None] = mapped_column(String(256), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     # Whichever provider they most recently logged in with - purely

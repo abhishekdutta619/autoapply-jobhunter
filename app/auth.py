@@ -48,6 +48,19 @@ def get_or_create_user(
     Non-owner logins are still keyed on email as the stable cross-provider
     identity (Google today, GitHub tomorrow, same email = same account).
     """
+    def _find_by_provider_id() -> User | None:
+        # Identity fallback for when email is None - not "no email set
+        # yet" but a login where the provider genuinely returned none
+        # this time. Without this, a GitHub account with no public/primary
+        # email would get a brand new User row on every single login,
+        # owner or not - see .env.example / config.py's OWNER_GITHUB_USERNAME
+        # comment on why this is a real case, not an edge case.
+        if not provider or not provider_id:
+            return None
+        return session.scalar(
+            select(User).where(User.provider == provider, User.provider_id == provider_id)
+        )
+
     if _matches_owner(email, provider, github_username):
         user = session.scalar(select(User).where(User.is_owner.is_(True)))
         if user is None and email:
@@ -57,6 +70,12 @@ def get_or_create_user(
             # reuse that placeholder row rather than creating a second one.
             user = session.scalar(select(User).where(User.email == email))
         if user is None:
+            # Covers the owner's own hidden-email GitHub login too: no
+            # is_owner row yet, no email to match a bootstrap placeholder
+            # against. Falls through to a fresh row below if this really
+            # is the very first login ever from this account.
+            user = _find_by_provider_id()
+        if user is None:
             user = User(is_owner=True)
             session.add(user)
         user.is_owner = True
@@ -65,6 +84,8 @@ def get_or_create_user(
     else:
         user = session.scalar(select(User).where(User.email == email)) if email else None
         if user is None:
+            user = _find_by_provider_id()
+        if user is None:
             user = User(email=email, is_owner=False)
             session.add(user)
         else:
@@ -72,6 +93,8 @@ def get_or_create_user(
             # or OWNER_GITHUB_USERNAME changes in .env later, the account
             # that no longer matches shouldn't stay flagged as owner.
             user.is_owner = False
+            if email:
+                user.email = email
 
     if name:
         user.name = name
