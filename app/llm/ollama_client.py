@@ -38,9 +38,10 @@ class OllamaEvaluator:
     recommendations for your specific hardware.
     """
 
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3.1:8b"):
+    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3.1:8b", keep_alive: str = "5m"):
         self._base_url = base_url.rstrip("/")
         self._model = model
+        self._keep_alive = keep_alive
 
     def _chat(self, system_prompt: str, user_prompt: str, schema: dict | None = None) -> str:
         payload = {
@@ -59,8 +60,14 @@ class OllamaEvaluator:
             # slower. Explicitly false here for every model: it's a no-op
             # for non-thinking-capable models like llama3.1:8b.
             "think": False,
-            # keep_alive: 0 forces Ollama to unload the context and free RAM immediately after each request
-            "keep_alive": 0,
+            # Was 0 (unload immediately after every request) - forced a full
+            # model reload from disk before every single job, stacked on top
+            # of the ~2.5min/job CPU-only inference cost measured on
+            # 2026-09-02's hybrid_test.log run. "5m" (Ollama's own default)
+            # keeps qwen3:4b warm between consecutive evaluator jobs, which
+            # run only seconds to low-minutes apart - it only unloads if the
+            # process is genuinely idle for 5+ minutes, e.g. between runs.
+            "keep_alive": self._keep_alive,
             # temperature=0 for determinism - Ollama's own docs recommend
             # this for schema-constrained generation specifically.
             "options": {

@@ -25,7 +25,11 @@ def _build_client(provider: str) -> LLMClient:
     if provider == "ollama":
         from app.llm.ollama_client import OllamaEvaluator
 
-        return OllamaEvaluator(base_url=settings.ollama_base_url, model=settings.ollama_model)
+        return OllamaEvaluator(
+            base_url=settings.ollama_base_url, 
+            model=settings.ollama_model,
+            keep_alive=settings.ollama_keep_alive,
+        )
 
     if provider == "gemini":
         from app.llm.gemini_client import GeminiEvaluator

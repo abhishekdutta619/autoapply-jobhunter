@@ -81,6 +81,10 @@ class Settings:
     # pulled; see README's "Local LLM (Ollama)" section.
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     ollama_model: str = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+    # Ollama's own default is "5m" if unset - made explicit and
+    # configurable here since keep_alive: 0 was previously stacking a full
+    # model-reload cost onto every single evaluator job.
+    ollama_keep_alive: str = os.getenv("OLLAMA_KEEP_ALIVE", "5m")
 
     resume_path: str = os.getenv("RESUME_PATH", "resume.md")
     # Original project spec: approve anything scoring *above* 85.
