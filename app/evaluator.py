@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 import time
 from pathlib import Path
 
@@ -32,6 +33,104 @@ def load_resume(path: str = None) -> str:
     if not text:
         raise ValueError(f"{resume_path} is empty.")
     return text
+
+
+# --- Fast pre-filter (runs before any LLM call) ---------------------------
+# Deliberately biased toward false positives (letting an ambiguous job
+# through to the LLM) over false negatives (silently discarding a good
+# match, with no human ever seeing it) - the cost of being wrong the "let
+# it through" way is one ~2.5min local-model call; the cost of being wrong
+# the "skip it" way is a job that disappears from the pipeline entirely.
+
+# Title-only, deliberately short and conservative - unambiguous
+# non-engineering roles only. Checked against title alone, never the
+# description, to keep this a narrow, low-risk signal.
+EXCLUDE_TITLE_KEYWORDS = [
+    "sales", "account executive", "recruiter", "talent acquisition",
+    "accountant", "bookkeeper", "human resources", "hr generalist",
+    "marketing manager", "executive assistant", "office manager",
+    "customer support", "content writer", "paralegal",
+]
+
+# Broad on purpose: this is a "does this look like a tech job at all"
+# check, not "does this match my exact stack" - that judgment stays with
+# the LLM. A job is only skipped by this list if it matches NONE of these
+# anywhere in title+description.
+SKILL_KEYWORDS = [
+    # languages
+    "javascript", "typescript", "python", "java", "c++", "c#", "golang",
+    "rust", "ruby", "php", "swift", "kotlin", "scala", "objective-c",
+    "dart", "elixir", "haskell", "clojure", "perl", "bash", "shell",
+    "sql", "html", "css", "sass", "less",
+    # frontend
+    "react", "redux", "angular", "vue", "svelte", "next.js", "nuxt",
+    "jquery", "mobx", "tailwind", "bootstrap", "material ui", "ember",
+    "backbone", "webcomponents", "web components",
+    # backend
+    "node.js", "nodejs", "express", "nestjs", "fastapi", "django",
+    "flask", "spring", "spring boot", "ruby on rails", "rails",
+    "laravel", ".net", "asp.net", "gin framework", "echo framework",
+    # mobile
+    "ios development", "android development", "react native", "flutter",
+    "xamarin", "ionic", "swiftui", "jetpack compose", "mobile app",
+    "mobile developer", "mobile engineer",
+    # databases
+    "mongodb", "postgresql", "postgres", "mysql", "sqlite", "redis",
+    "cassandra", "dynamodb", "firebase", "firestore", "graphql",
+    "elasticsearch",
+    # cloud / devops
+    "aws", "azure", "gcp", "google cloud", "docker", "kubernetes",
+    "terraform", "ci/cd", "jenkins", "github actions", "gitlab ci",
+    "microservices", "serverless",
+    # tooling
+    "git", "webpack", "vite", "babel", "npm", "yarn", "jest", "mocha",
+    "cypress", "selenium", "postman", "rest api", "restful",
+    # generic role/domain signals
+    "software engineer", "software developer", "web developer",
+    "application developer", "systems engineer", "devops engineer",
+    "site reliability", "platform engineer", "frontend", "front-end",
+    "front end", "backend", "back-end", "back end", "full stack",
+    "fullstack", "ui developer", "ux developer", "single page application",
+    "progressive web app", "api development", "sdk",
+]
+
+_WORD_RE_CACHE: dict[str, re.Pattern] = {}
+
+
+def _keyword_in(keyword: str, haystack: str) -> bool:
+    """Plain substring match, except for short single-word tokens (<4
+    chars) where `in` would false-positive on almost any text (e.g. a bare
+    "go" or "r" matching inside unrelated words) - those get a
+    word-boundary regex instead."""
+    if len(keyword) < 4 and " " not in keyword:
+        pattern = _WORD_RE_CACHE.setdefault(
+            keyword, re.compile(rf"\b{re.escape(keyword)}\b")
+        )
+        return bool(pattern.search(haystack))
+    return keyword in haystack
+
+
+def prefilter_skip_reason(job: Job) -> str | None:
+    """Cheap, keyword-only check that runs before any LLM call. Returns a
+    human-readable skip reason if this job is obviously out of scope, or
+    None if it should proceed to the LLM as normal. Two independent
+    checks, either one can skip:
+      1. Title matches an unambiguous non-engineering role keyword.
+      2. Neither the title nor the description contains a single
+         software/web/mobile-development signal - this doesn't look like
+         a tech job at all.
+    """
+    title_lower = job.title.lower()
+
+    for neg in EXCLUDE_TITLE_KEYWORDS:
+        if _keyword_in(neg, title_lower):
+            return f"Pre-filter: title matched non-engineering keyword '{neg}'"
+
+    haystack = title_lower + " " + strip_html(job.description_html or "").lower()
+    if not any(_keyword_in(pos, haystack) for pos in SKILL_KEYWORDS):
+        return "Pre-filter: no software/web/mobile development keyword found in title or description"
+
+    return None
 
 
 def evaluate_job(
@@ -88,6 +187,7 @@ def run(limit: int | None = None) -> None:
     evaluated = 0
     approved = 0
     queued_for_review = 0
+    skipped_prefilter = 0
     failed = 0
 
     try:
@@ -122,6 +222,19 @@ def run(limit: int | None = None) -> None:
 
         for job in pending:
             try:
+                skip_reason = prefilter_skip_reason(job)
+                if skip_reason is not None:
+                    # match_score stays None on purpose - this job was
+                    # never actually scored by an LLM, distinct from a
+                    # real score of 0. Status change alone is enough to
+                    # remove it from future runs' query.
+                    job.status = JobStatus.TRASHED.value
+                    job.rationale = skip_reason
+                    session.commit()
+                    skipped_prefilter += 1
+                    log.info("%-40s %s", job.title[:40], skip_reason)
+                    continue  # no LLM call made - skip the rate-limit sleep too
+
                 evaluate_job(
                     job, llm_client, resume_text,
                     settings.approval_threshold, settings.review_threshold,
@@ -138,14 +251,16 @@ def run(limit: int | None = None) -> None:
                 log.error("Failed evaluating job id=%s: %s", job.id, exc)
                 # Status is left untouched (still PENDING_EVALUATION, still
                 # match_score=None) so this job gets retried on the next run.
+                continue
 
             time.sleep(settings.eval_request_delay_seconds)
     finally:
         session.close()
 
     log.info(
-        "Done. %d evaluated, %d approved, %d queued for review, %d failed/skipped.",
-        evaluated, approved, queued_for_review, failed,
+        "Done. %d evaluated, %d approved, %d queued for review, %d skipped by "
+        "pre-filter, %d failed.",
+        evaluated, approved, queued_for_review, skipped_prefilter, failed,
     )
 
 
