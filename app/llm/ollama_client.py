@@ -73,6 +73,12 @@ class OllamaEvaluator:
             "options": {
                 "temperature": 0,
                 "num_ctx": 4096,  # Cap context window size to prevent RAM bloat
+                # Hard cap on output tokens - bounds worst-case generation
+                # length for any pathological future job, independent of
+                # whatever caused job 223's two timeouts (root cause never
+                # confirmed - reproduction attempts to isolate it came back
+                # clean both times).
+                "num_predict": 1024,
             },
         }
         if schema is not None:
@@ -82,8 +88,15 @@ class OllamaEvaluator:
             # Local inference (especially CPU-only) can be genuinely slow -
             # a short cloud-API-style timeout would fail valid, if slow,
             # responses.
+            # Was 300s. Two unexplained hangs (2026-09-02, 2026-09-03) each
+            # burned the full 300s before failing - with keep_alive fixed and
+            # num_predict now capping runaway generation, a genuinely slow
+            # (not stuck) response has much less need for 5 minutes of
+            # headroom. If a normal job legitimately needs longer than this,
+            # raise it back up - but 90s should already comfortably exceed
+            # the ~70-120s this hardware's healthy jobs have measured at.
             response = httpx.post(
-                f"{self._base_url}/api/chat", json=payload, timeout=300.0
+                f"{self._base_url}/api/chat", json=payload, timeout=180.0
             )
             response.raise_for_status()
         except httpx.ConnectError as exc:
