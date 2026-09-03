@@ -8,25 +8,40 @@ log = logging.getLogger("llm.hybrid")
 
 
 class HybridEvaluator:
-    """Bulk jobs -> local model -> clear reject/clear match (done) or
-    ambiguous (escalate to cloud for a second opinion).
+    """Bulk jobs -> local model -> clear reject (done) or anything else
+    (escalate to cloud for a second opinion).
 
     Exists because of a very concrete constraint found this session: a
     free-tier cloud model's daily quota (as low as 20 requests/day for a
     new preview model) makes evaluating a large queue entirely on cloud
     impractical, but a local model alone has its own real issues (thermal
-    throttling, thinking-mode overhead depending on model). This spends
-    the scarce cloud budget only on jobs the local model itself is unsure
-    about - reusing your existing review_threshold/approval_threshold
-    bounds as the definition of "unsure", rather than introducing a
-    separate threshold concept.
+    throttling, thinking-mode overhead depending on model).
+
+    Originally only escalated scores inside [review_threshold,
+    approval_threshold] as "ambiguous," trusting local scoring fully
+    above approval_threshold. That trust turned out to be misplaced: two
+    separate real spot-checks (2026-09-03) found qwen3:4b producing
+    confidently wrong high scores via two DIFFERENT failure modes - job
+    id=160 leaked raw chain-of-thought identifying a disqualifying gap
+    and scored 100 anyway; job id=268 fabricated a plausible-sounding but
+    unsupported equivalence (reframing unrelated experience as meeting
+    the role's actual requirements) with no admitted gap at all, also
+    scored 100. An intermediate fix tried catching the first failure mode
+    via a reasoning-text phrase list - it missed job 268 entirely, since
+    confabulation doesn't contain any of the trigger phrases a stated-
+    then-ignored gap would. Given two structurally distinct ways to be
+    wrong in the same score range, and no evidence local scoring below
+    review_threshold has ever been wrong, the local model is no longer
+    trusted for APPROVE at all - only for TRASH. Every other score gets
+    a cloud second opinion. This trades cloud-call volume (which was
+    previously bounded to the narrow ambiguous band) for meaningfully
+    higher confidence in what actually reaches APPROVED_FOR_APPLY -
+    worth it given what reaches that status can eventually feed Phase 3
+    (Executor) once that's in real use.
 
     evaluate_match() is the only method this actually makes hybrid.
     draft_answer() and select_dropdown_option() delegate to the local
-    client only - there's no natural "ambiguous" signal for a drafted
-    answer or a dropdown pick the way there is for a numeric score, and
-    those are Phase 3 (Executor) concerns that haven't been run against
-    real applications yet regardless.
+    client only - see prior version of this docstring for why.
     """
 
     def __init__(
@@ -46,21 +61,20 @@ class HybridEvaluator:
     ) -> EvaluationResult:
         local_result = self._local.evaluate_match(resume, job_title, job_description)
 
-        if self._review_threshold <= local_result.score <= self._approval_threshold:
-            log.info(
-                "Local score %d is ambiguous (%d-%d band) for %r - escalating to cloud",
-                local_result.score, self._review_threshold, self._approval_threshold, job_title,
-            )
-            # Let this raise on failure (e.g. daily quota exhausted) rather
-            # than silently falling back to the uncertain local result -
-            # evaluate_job()'s caller already catches and retries next run,
-            # same as any other transient evaluation failure.
-            cloud_result = self._cloud.evaluate_match(resume, job_title, job_description)
-            return cloud_result
+        if local_result.score < self._review_threshold:
+            # Clear reject - no confirmed failure case at this end yet,
+            # trust the local model and save the cloud call.
+            return local_result
 
-        # Clear reject or clear match - trust the local model, save the
-        # cloud call for a job that actually needs it.
-        return local_result
+        log.info(
+            "Local score %d for %r is >= review_threshold (%d) - "
+            "escalating to cloud (local scoring is no longer trusted at "
+            "or above this bound, following two confirmed high-score "
+            "failure modes)",
+            local_result.score, job_title, self._review_threshold,
+        )
+        cloud_result = self._cloud.evaluate_match(resume, job_title, job_description)
+        return cloud_result
 
     def draft_answer(
         self,

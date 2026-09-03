@@ -17,7 +17,8 @@ from app.llm.base import LLMClient
 from app.llm.factory import get_llm_client
 from app.llm.prompts import build_constraints_section
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("evaluator")
 
 
@@ -50,6 +51,16 @@ EXCLUDE_TITLE_KEYWORDS = [
     "accountant", "bookkeeper", "human resources", "hr generalist",
     "marketing manager", "executive assistant", "office manager",
     "customer support", "content writer", "paralegal",
+    # Added 2026-09-03 after real queue data showed a recurring
+    # audit/compliance/legal/ops category the original list missed
+    # entirely - 12 jobs burned a full local LLM call each before
+    # scoring 15-72, none coming close to a real match:
+    "internal audit", "auditor", "sox controls", "controls specialist",
+    "sanctions", "kyc", "kyb", "tax advisory", "tax consultant",
+    "indirect tax", "legal entity", "legal operations",
+    "administrative coordinator", "product support operations",
+    "technical account manager", "technical account management",
+    "marketing operations",
 ]
 
 # Broad on purpose: this is a "does this look like a tech job at all"
@@ -91,9 +102,9 @@ SKILL_KEYWORDS = [
     "site reliability", "platform engineer", "frontend", "front-end",
     "front end", "backend", "back-end", "back end", "full stack",
     "fullstack", "ui developer", "ux developer", "single page application",
-    "progressive web app", "api development", "sdk", "framework", "library", 
-    "open source","forward engineering", "product engineer", "technical lead", 
-    "tech lead", "ai developer", "ai engineer", "machine learning", "llm", 
+    "progressive web app", "api development", "sdk", "framework", "library",
+    "open source", "forward engineering", "product engineer", "technical lead",
+    "tech lead", "ai developer", "ai engineer", "machine learning", "llm",
     "rag", "retrieval-augmented generation", "vector database",
 ]
 
@@ -129,11 +140,50 @@ def prefilter_skip_reason(job: Job) -> str | None:
         if _keyword_in(neg, title_lower):
             return f"Pre-filter: title matched non-engineering keyword '{neg}'"
 
-    haystack = title_lower + " " + strip_html(job.description_html or "").lower()
+    haystack = title_lower + " " + \
+        strip_html(job.description_html or "").lower()
     if not any(_keyword_in(pos, haystack) for pos in SKILL_KEYWORDS):
         return "Pre-filter: no software/web/mobile development keyword found in title or description"
 
     return None
+
+
+# --- Repeated-failure tracking (job id=223's unresolved hang) --------------
+# Root cause never identified: 4/4 real-batch timeouts, but every isolated
+# reproduction attempt (debug_223.py, debug_223_full_prompt.py,
+# debug_sequence.py) succeeded cleanly. Rather than let a job with an
+# unknown failure mode retry forever at ~180s/attempt indefinitely, this
+# counts consecutive failures per-job (encoded in `rationale`, no schema
+# change needed) and gives up after MAX_EVAL_FAILURES, surfacing it in
+# TRASHED for manual attention instead of silently costing a full timeout
+# on every future run forever.
+_FAILURE_PREFIX_RE = re.compile(r"^\[EVAL FAILED (\d+)x\] ")
+MAX_EVAL_FAILURES = 3
+
+
+def _record_failure_and_maybe_give_up(job: Job, exc: Exception) -> None:
+    existing = job.rationale or ""
+    match = _FAILURE_PREFIX_RE.match(existing)
+    count = int(match.group(1)) + 1 if match else 1
+    remainder = existing[match.end():] if match else existing
+
+    if count >= MAX_EVAL_FAILURES:
+        job.status = JobStatus.TRASHED.value
+        job.rationale = (
+            f"[AUTO-TRASHED: failed evaluation {count}x, last error: {exc}] "
+            "Root cause not identified - repeated failures with no "
+            "consistent reproduction in isolation. Re-queue manually "
+            "(set status back to PENDING_EVALUATION, clear this rationale) "
+            "to retry."
+        )
+        log.error(
+            "Job id=%s failed evaluation %d times - giving up, moved to TRASHED for manual review.",
+            job.id, count,
+        )
+    else:
+        job.rationale = f"[EVAL FAILED {count}x] {remainder}"
+        log.error("Failed evaluating job id=%s (%d/%d): %s",
+                  job.id, count, MAX_EVAL_FAILURES, exc)
 
 
 def evaluate_job(
@@ -251,9 +301,8 @@ def run(limit: int | None = None) -> None:
             except Exception as exc:  # noqa: BLE001 - one bad job shouldn't kill the run
                 session.rollback()
                 failed += 1
-                log.error("Failed evaluating job id=%s: %s", job.id, exc)
-                # Status is left untouched (still PENDING_EVALUATION, still
-                # match_score=None) so this job gets retried on the next run.
+                _record_failure_and_maybe_give_up(job, exc)
+                session.commit()
                 continue
 
             time.sleep(settings.eval_request_delay_seconds)
