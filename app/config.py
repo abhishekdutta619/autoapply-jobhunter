@@ -131,7 +131,7 @@ class Settings:
     session_secret_key: str = os.getenv("SESSION_SECRET_KEY", "dev-insecure-change-me")
 
     # Where the OAuth callback sends the browser after login succeeds.
-    frontend_base_url: str = os.getenv("FRONTEND_BASE_URL", "http://localhost:4200")
+    frontend_base_url: str = os.getenv("FRONTEND_BASE_URL", "http://127.0.0.1:4200")
 
     # --- Executor (Phase 3) ---
     candidate_profile_path: str = os.getenv("CANDIDATE_PROFILE_PATH", "candidate_profile.json")

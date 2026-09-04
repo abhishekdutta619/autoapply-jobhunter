@@ -18,3 +18,4 @@ hybrid_test.log
 prefilter_test.log
 contradiction_test.log
 debug/
+*.pdf
