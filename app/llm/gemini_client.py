@@ -8,7 +8,7 @@ from google import genai
 from google.genai import errors, types
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
-from app.llm.base import DropdownSelection, EvaluationResult
+from app.llm.base import CloudQuotaExhaustedError, DropdownSelection, EvaluationResult
 from app.llm.prompts import (
     ANSWER_SYSTEM_PROMPT,
     DROPDOWN_SYSTEM_PROMPT,
@@ -22,34 +22,38 @@ from app.llm.prompts import (
 
 log = logging.getLogger("llm.gemini")
 
-# Confirmed against a real run: WinError 10053 (connection aborted by the
-# host) surfaced as an httpx.TransportError, not a google.genai.errors
-# .APIError - so it wasn't retried at all, and with no request timeout
-# configured (the SDK's default is unbounded), that single hung
-# connection took ~20 minutes to finally fail. Both gaps fixed here:
-# network-level errors are now retried too, and REQUEST_TIMEOUT_MS caps
-# how long any one attempt can hang before tenacity moves on to a retry.
-REQUEST_TIMEOUT_MS = 60_000  # 60s - generous for a Flash-class classification call, not 20 minutes
+REQUEST_TIMEOUT_MS = 60_000
 
-# 429 (quota exceeded) and 503 (server overloaded) are both transient -
-# worth retrying with backoff. Everything else (404 wrong model name, 400
-# bad request, 403 bad key) is permanent - retrying just wastes time and
-# delays the actual error. Confirmed against a real run: free-tier quota
-# for gemini-3.7-flash was measured at exactly 5 requests/minute for this
-# project - published rate-limit numbers online are unreliable and
-# conflict with each other (5/10/15/30 RPM depending on source and date),
-# so this retries on the *symptom* (429/503) rather than trying to compute
-# a "safe" delay from a number that isn't stable enough to trust.
 _TRANSIENT_CODES = {429, 503}
 
 
+def _is_daily_quota_exhausted(exc: errors.APIError) -> bool:
+    """Distinguishes a DAILY quota exhaustion from a short-lived 429 rate
+    limit - Google returns the identical HTTP 429 / RESOURCE_EXHAUSTED
+    status for both. Verified against a real 2026-09-04 error: the
+    QuotaFailure detail's quotaId contains "PerDay" for a genuine daily
+    exhaustion (GenerateRequestsPerDayPerProjectPerModel-FreeTier)."""
+    try:
+        detail_entries = exc.details.get("error", {}).get("details", [])
+    except AttributeError:
+        return False
+    for entry in detail_entries:
+        if str(entry.get("@type", "")).endswith("QuotaFailure"):
+            for violation in entry.get("violations", []):
+                if "PerDay" in violation.get("quotaId", ""):
+                    return True
+    return False
+
+
 def _is_transient(exc: BaseException) -> bool:
+    if isinstance(exc, CloudQuotaExhaustedError):
+        # Won't clear on any retry schedule that fits within a single
+        # run - retrying wastes the full budget for nothing. Confirmed:
+        # a 2026-09-04 run burned all 4 attempts on 20+ jobs against an
+        # already-exhausted quota before giving up on each one anyway.
+        return False
     if isinstance(exc, errors.APIError):
         return getattr(exc, "code", None) in _TRANSIENT_CODES
-    # Connection drops, read timeouts, protocol errors - confirmed real
-    # (WinError 10053 on Windows), not hypothetical. Always worth a retry;
-    # there's no permanent-vs-transient distinction to make here the way
-    # there is for HTTP status codes.
     return isinstance(exc, httpx.TransportError)
 
 
@@ -104,6 +108,11 @@ class GeminiEvaluator:
                 model=self._model, contents=contents, config=config
             )
         except errors.ClientError as exc:
+            if getattr(exc, "code", None) == 429 and _is_daily_quota_exhausted(exc):
+                raise CloudQuotaExhaustedError(
+                    f"Gemini daily free-tier request quota exhausted for "
+                    f"model {self._model!r}. Original: {exc.message}"
+                ) from exc
             if getattr(exc, "code", None) == 404:
                 raise errors.ClientError(
                     exc.code,

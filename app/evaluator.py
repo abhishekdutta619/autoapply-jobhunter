@@ -13,9 +13,10 @@ from app.config import settings
 from app.db.models import Job, JobStatus
 from app.db.session import get_session, init_db
 from app.text_utils import strip_html
-from app.llm.base import LLMClient
+from app.llm.base import CloudQuotaExhaustedError, LLMClient
 from app.llm.factory import get_llm_client
 from app.llm.prompts import build_constraints_section
+
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(message)s")
@@ -298,6 +299,22 @@ def run(limit: int | None = None) -> None:
                     approved += 1
                 elif job.status == JobStatus.PENDING_EVALUATION.value:
                     queued_for_review += 1
+            except CloudQuotaExhaustedError as exc:
+                # Not a per-job defect and not a hang (see
+                # _record_failure_and_maybe_give_up below) - deliberately
+                # NOT counted toward MAX_EVAL_FAILURES. Counting this
+                # would eventually auto-TRASH a possibly great match
+                # purely because of unlucky timing against quota, which
+                # resets on Google's own schedule and has nothing to do
+                # with this specific job. Status/rationale left untouched
+                # so it's retried normally on a future run.
+                session.rollback()
+                failed += 1
+                log.info(
+                    "Skipping job id=%s for now - %s Will retry on a "
+                    "future run.", job.id, exc,
+                )
+                continue
             except Exception as exc:  # noqa: BLE001 - one bad job shouldn't kill the run
                 session.rollback()
                 failed += 1
