@@ -108,23 +108,26 @@ class GeminiEvaluator:
                 model=self._model, contents=contents, config=config
             )
         except errors.ClientError as exc:
-            if getattr(exc, "code", None) == 429 and _is_daily_quota_exhausted(exc):
+            code = getattr(exc, "code", None)
+            if code == 402:
+                raise CloudQuotaExhaustedError(
+                    f"Gemini billing/prepayment issue for model "
+                    f"{self._model!r} - not a per-job problem. "
+                    f"Original: {exc.message}"
+                ) from exc
+            if code == 429 and _is_daily_quota_exhausted(exc):
                 raise CloudQuotaExhaustedError(
                     f"Gemini daily free-tier request quota exhausted for "
                     f"model {self._model!r}. Original: {exc.message}"
                 ) from exc
-            if getattr(exc, "code", None) == 404:
+            if code == 404:
                 raise errors.ClientError(
                     exc.code,
-                    {
-                        "error": {
-                            "message": (
-                                f"{exc.message} (GEMINI_MODEL={self._model!r} in your .env - "
-                                "check https://ai.dev/rate-limit for currently available "
-                                "models on your project if this model has been retired)"
-                            )
-                        }
-                    },
+                    {"error": {"message": (
+                        f"{exc.message} (GEMINI_MODEL={self._model!r} in your .env - "
+                        "check https://ai.dev/rate-limit for currently available "
+                        "models on your project if this model has been retired)"
+                    )}},
                     exc.response,
                 ) from exc
             raise
