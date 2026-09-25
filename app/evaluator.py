@@ -13,7 +13,7 @@ from app.config import settings
 from app.db.models import Job, JobStatus
 from app.db.session import get_session, init_db
 from app.text_utils import strip_html
-from app.llm.base import CloudQuotaExhaustedError, LLMClient
+from app.llm.base import NonJobEvaluationError, LLMClient
 from app.llm.factory import get_llm_client
 from app.llm.prompts import build_constraints_section
 
@@ -299,15 +299,15 @@ def run(limit: int | None = None) -> None:
                     approved += 1
                 elif job.status == JobStatus.PENDING_EVALUATION.value:
                     queued_for_review += 1
-            except CloudQuotaExhaustedError as exc:
-                # Not a per-job defect and not a hang (see
-                # _record_failure_and_maybe_give_up below) - deliberately
-                # NOT counted toward MAX_EVAL_FAILURES. Counting this
-                # would eventually auto-TRASH a possibly great match
-                # purely because of unlucky timing against quota, which
-                # resets on Google's own schedule and has nothing to do
-                # with this specific job. Status/rationale left untouched
-                # so it's retried normally on a future run.
+            except NonJobEvaluationError as exc:
+                # Not a per-job defect - an external/environmental
+                # condition (cloud quota exhausted, a local provider
+                # unreachable, etc. - see app/llm/base.py). Deliberately
+                # NOT counted toward MAX_EVAL_FAILURES. Real bug this
+                # prevents, confirmed 2026-09-23: 12 jobs each took a
+                # real strike because Ollama hadn't finished starting yet
+                # when the run began - present for every job in that
+                # window, not a defect in any one of them.
                 session.rollback()
                 failed += 1
                 log.info(

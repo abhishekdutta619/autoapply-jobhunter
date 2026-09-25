@@ -19,3 +19,4 @@ prefilter_test.log
 contradiction_test.log
 debug/
 *.pdf
+*.csv

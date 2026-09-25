@@ -4,7 +4,7 @@ import json
 
 import httpx
 
-from app.llm.base import DropdownSelection, EvaluationResult
+from app.llm.base import DropdownSelection, EvaluationResult, ProviderUnavailableError
 from app.llm.prompts import (
     ANSWER_SYSTEM_PROMPT,
     DROPDOWN_SYSTEM_PROMPT,
@@ -100,7 +100,7 @@ class OllamaEvaluator:
             )
             response.raise_for_status()
         except httpx.ConnectError as exc:
-            raise ConnectionError(
+            raise ProviderUnavailableError(
                 f"Could not reach Ollama at {self._base_url}. Is it running? "
                 "Check the Ollama app/tray icon, or start it with "
                 f"'ollama serve'. Also confirm the model is pulled: "
